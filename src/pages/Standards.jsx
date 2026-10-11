@@ -33,6 +33,7 @@ function Browse() {
   const grades = fw ? [...new Set(fw.standards.map((s) => s.grade))] : [];
   const list = (fw?.standards || []).filter((s) => (!grade || s.grade === grade) && (!q || `${s.code} ${s.description}`.toLowerCase().includes(q.toLowerCase())));
   const [form, setForm] = useState({ code: '', description: '', grade: '' });
+  const [newFw, setNewFw] = useState('');
 
   const importCSV = (e) => {
     const file = e.target.files[0];
@@ -70,13 +71,15 @@ function Browse() {
           </button>
         ))}
         <div className="card">
-          <button onClick={() => {
-            const name = window.prompt('Framework name (e.g. “Springfield District Art Standards”)');
-            if (!name) return;
-            const id = uid('fw');
-            update((d) => { d.frameworks.push({ id, name, subject: 'Custom', region: 'Local', standards: [] }); });
-            setFwId(id);
-          }}>+ New framework</button>
+          <div className="row">
+            <input placeholder="New framework name" value={newFw} onChange={(e) => setNewFw(e.target.value)} className="grow" />
+            <button disabled={!newFw.trim()} onClick={() => {
+              const id = uid('fw');
+              update((d) => { d.frameworks.push({ id, name: newFw.trim(), subject: 'Custom', region: 'Local', standards: [] }); });
+              setFwId(id);
+              setNewFw('');
+            }}>+ Add</button>
+          </div>
           <label className="btn">Import CSV<input type="file" accept=".csv,text/csv" hidden onChange={importCSV} /></label>
           <button className="link-btn small" onClick={() => download('standards-template.csv', toCSV([['framework', 'subject', 'code', 'grade', 'description'], ['My District Science', 'Science', 'SCI.6.1', '6', 'Describe…']]), 'text/csv')}>CSV template</button>
         </div>

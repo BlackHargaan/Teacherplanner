@@ -77,8 +77,14 @@ export function LessonContent({ lesson, cls, opts = {} }) {
   );
 }
 
+/** Files stored in the desktop planner folder are served through vault:// */
+export function attachmentHref(a) {
+  if (a.path) return `vault://file/${a.path.split('/').map(encodeURIComponent).join('/')}`;
+  return a.dataUrl || a.url;
+}
+
 export function AttachmentLink({ a }) {
-  const href = a.dataUrl || a.url;
+  const href = attachmentHref(a);
   const isImage = a.type === 'image' && href;
   return (
     <a className="attachment" href={href} target="_blank" rel="noreferrer" download={a.dataUrl ? a.name : undefined}>

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useStore } from '../lib/store.jsx';
+import { host, useStore } from '../lib/store.jsx';
 import {
   canEdit, effectiveTemplateIds, lessonHome, makeLesson, sectionAccess, standardIndex, templateTextFor, uid,
 } from '../lib/model.js';
@@ -8,7 +8,7 @@ import { copyLesson, findClass } from '../lib/actions.js';
 import { formatDate, formatTime } from '../lib/dates.js';
 import { ACCOMMODATIONS, ATTACHMENT_TYPES, DIFFERENTIATION, STRATEGIES } from '../data/presets.js';
 import { Chip, Field, Modal, MultiPicker } from './ui.jsx';
-import { sectionStyle } from './LessonContent.jsx';
+import { attachmentHref, sectionStyle } from './LessonContent.jsx';
 
 const MAX_FILE = 1.5 * 1024 * 1024;
 
@@ -26,12 +26,21 @@ export function AttachmentEditor({ value, onChange, disabled }) {
     const file = e.target.files[0];
     e.target.value = '';
     if (!file) return;
+    const kind = file.type.startsWith('image/') ? 'image' : type === 'link' ? 'file' : type;
+    if (host) {
+      // Desktop: copy the file into the planner folder's attachments/ (no size limit).
+      file.arrayBuffer()
+        .then((buf) => host.saveAttachment(file.name, buf))
+        .then((path) => add({ type: kind, name: name || file.name, path }))
+        .catch(() => notify('Could not copy the file into your planner folder.', true));
+      return;
+    }
     if (file.size > MAX_FILE) {
       notify('Files over 1.5 MB are too large to store in the browser — upload to Google Drive and attach the link instead.', true);
       return;
     }
     const reader = new FileReader();
-    reader.onload = () => add({ type: file.type.startsWith('image/') ? 'image' : type === 'link' ? 'file' : type, name: name || file.name, dataUrl: reader.result });
+    reader.onload = () => add({ type: kind, name: name || file.name, dataUrl: reader.result });
     reader.readAsDataURL(file);
   };
   return (
@@ -39,7 +48,7 @@ export function AttachmentEditor({ value, onChange, disabled }) {
       {value.map((a) => (
         <div key={a.id} className="attach-row">
           <span className="att-type">{ATTACHMENT_TYPES[a.type]}</span>
-          <a href={a.dataUrl || a.url} target="_blank" rel="noreferrer">{a.name || a.url}</a>
+          <a href={attachmentHref(a)} target="_blank" rel="noreferrer">{a.name || a.url}</a>
           {!disabled && <button className="icon-btn" onClick={() => onChange(value.filter((x) => x.id !== a.id))} aria-label="Remove attachment">✕</button>}
         </div>
       ))}

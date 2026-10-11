@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { useStore, resetToDemo, resetToEmpty } from '../lib/store.jsx';
+import { host, useStore, resetToDemo, resetToEmpty } from '../lib/store.jsx';
 import { uid } from '../lib/model.js';
 import { download } from '../components/ui.jsx';
 import { today } from '../lib/dates.js';
 
 export default function Settings() {
-  const { state, update, replace, notify, userId } = useStore();
+  const { state, update, replace, notify, userId, vault, openVault } = useStore();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const me = state.users.find((u) => u.id === userId);
@@ -84,7 +84,29 @@ export default function Settings() {
 
         <section className="card">
           <h2>Data</h2>
-          <p className="small muted">Everything is stored in this browser. Export a backup regularly, or to move to another computer.</p>
+          {host && vault?.vaultPath ? (
+            <>
+              <p className="small">Your planner folder:<br /><code>{vault.vaultPath}</code></p>
+              <p className="small muted">Saved automatically as you work, with a daily backup in its <code>backups</code> folder. Keep this folder in OneDrive, Google Drive or Dropbox to use the planner on more than one computer (one computer at a time).</p>
+              <div className="row wrap">
+                <button onClick={() => host.openPath()}>Open folder</button>
+                <button onClick={async () => {
+                  const info = await host.chooseFolder('pick');
+                  if (!info) return;
+                  if (info.hasData) {
+                    if (!window.confirm('That folder already has a planner. Switch to it? (Your current folder is left untouched.)')) return;
+                  } else {
+                    await host.save(JSON.stringify(state, null, 1));
+                  }
+                  await openVault(info);
+                  notify(info.hasData ? 'Opened planner folder' : 'Planner moved to the new folder');
+                }}>Move / switch folder…</button>
+              </div>
+              <p className="small muted">Version {vault.version}</p>
+            </>
+          ) : (
+            <p className="small muted">Everything is stored in this browser. Export a backup regularly, or to move to another computer.</p>
+          )}
           <div className="row wrap">
             <button className="primary" onClick={() => download(`teacher-planner-backup-${today()}.json`, JSON.stringify(state), 'application/json')}>Export backup</button>
             <label className="btn">Import backup<input type="file" accept="application/json,.json" hidden onChange={importBackup} /></label>

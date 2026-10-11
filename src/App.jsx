@@ -1,4 +1,5 @@
-import { useStore } from './lib/store.jsx';
+import { host, useStore } from './lib/store.jsx';
+import Welcome from './pages/Welcome.jsx';
 import { useHashRoute } from './lib/router.js';
 import { currentUser } from './lib/model.js';
 import Planner from './pages/Planner.jsx';
@@ -30,6 +31,7 @@ const PAGES = [
 export default function App() {
   const { state, update, toast, year } = useStore();
   const [route, param] = useHashRoute();
+  if (host && !state) return <><Welcome /><Toast toast={toast} /></>;
   if (route === 'view') return <>{<Viewer id={param} />}<Toast toast={toast} /></>;
   const [id, , Page] = PAGES.find(([p]) => p === route) || PAGES[0];
   const me = currentUser(state);

@@ -2,16 +2,69 @@
 
 A lesson-planning app for teachers: flexible class schedules, sequenced lessons that flow around schedule changes, templates, standards, collaboration, shared views, gradebook and seating charts.
 
-Built with React + Vite. Everything runs in the browser and data is saved to `localStorage`, with JSON backup/restore.
+Teacher Planner is a **desktop app for Windows, Mac and Linux**. Like Obsidian, your plans are saved as ordinary files in a folder you choose, so they're yours, work offline and are easy to back up.
+
+## Installing (for teachers)
+
+1. Go to the **[Releases page](https://github.com/BlackHargaan/Teacherplanner/releases/latest)** and download the file for your computer:
+   - **Windows:** `Teacher-Planner-…-win-x64.exe`. Double-click it. It installs in a few seconds, with no admin rights needed, and adds a desktop shortcut.
+   - **Mac:** `Teacher-Planner-…-mac-universal.dmg`. Open it and drag Teacher Planner into Applications.
+   - **Linux:** the `.AppImage` (make it executable, then run it) or the `.deb`.
+2. On first launch, pick where to keep your planner:
+   - **Save my planner in Documents** creates `Documents/Teacher Planner`.
+   - **Choose another folder…** lets you pick a folder in **OneDrive, Google Drive or Dropbox** to use the same planner at home and at school. Install the app on both computers and choose the same folder.
+3. Start with the sample classes to explore, or start empty.
+
+The app checks GitHub Releases for new versions and updates itself.
+
+> **First-run security prompts.** The installers aren't code-signed yet, so the computer warns the first time:
+> - **Windows** shows "Windows protected your PC". Click **More info → Run anyway**.
+> - **Mac** says the app "can't be opened". **Right-click the app → Open → Open**, once.
+>
+> Both go away once the builds are signed (see *Releasing*).
+
+### Your planner folder
+
+```
+Teacher Planner/
+  planner.json    your classes, lessons, grades and settings (plain JSON)
+  attachments/    files attached to lessons (no size limit)
+  backups/        one automatic copy per day, the last 30 days
+  README.txt
+```
+
+- Saves are atomic, so a crash never leaves a half-written file.
+- **To restore a backup:** quit the app and copy a file from `backups/` over `planner.json`.
+- **Settings → Data** shows the folder and can open it, or move the planner to a different folder.
+- If the file changes underneath the app (for example OneDrive syncing edits from your other computer), the app reloads it automatically. Use one computer at a time: two computers editing at once can overwrite each other's changes.
+
+## Developing
 
 ```bash
 npm install
-npm run dev      # http://localhost:5173
-npm test         # schedule engine, sequencing, reports, CSV, iCalendar
-npm run build    # static site in dist/
+npm run dev        # browser version at http://localhost:5173 (saves to localStorage)
+npm run desktop    # build and run the desktop app
+npm test           # schedule engine, sequencing, reports, CSV, iCalendar
+npm run dist:linux # build installers locally (also dist:win / dist:mac, on that OS)
 ```
 
-The first launch loads sample data (three classes, a colleague's shared lesson bank, a roster, grades and two shared views). **Settings → Start fresh** clears it.
+### Releasing
+
+Bump `version` in `package.json`, commit, then tag and push:
+
+```bash
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+The **Desktop installers** GitHub Action (`.github/workflows/release.yml`) builds Windows, Mac and Linux installers and publishes them, with auto-update metadata, on the Releases page. **Actions → Desktop installers → Run workflow** builds the installers as downloadable artifacts without publishing.
+
+To remove the security prompts, add code signing:
+- **Mac:** an Apple Developer account (US$99/yr). Set the `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD` and `APPLE_TEAM_ID` secrets for notarization.
+- **Windows:** a code-signing certificate, or Azure Trusted Signing.
+
+Then remove `CSC_IDENTITY_AUTO_DISCOVERY: 'false'` from the workflow.
+
+The first launch can load sample data (three classes, a colleague's shared lesson bank, a roster, grades and two shared views). **Settings → Start fresh** clears it.
 
 ## Features
 
@@ -26,7 +79,7 @@ Lessons are stored as an ordered sequence per class: lesson *n* is taught at the
 
 ### Lesson development
 - Up to **10 sections** per class/bank, with preset layouts (Standard, 5E, Madeline Hunter, Gradual Release, Workshop, UbD, Simple). Each section has its own color, font (including any custom font name), size and bold setting, and can be shown or hidden.
-- Attachments: links, videos, images, files (≤1.5 MB, stored in the browser), Google Drive links, assignments and assessments.
+- Attachments: links, videos, images, files (copied into the planner folder on desktop; ≤1.5 MB in the browser version), Google Drive links, assignments and assessments.
 - Custom **status tags** (Draft, Ready, Needs Review, Approved, Taught…).
 - Standards, teaching strategies, differentiation and accommodations come from a built-in library, and you can add your own entries.
 - Class color, font, text size and display order.
@@ -64,7 +117,7 @@ Lessons are stored as an ordered sequence per class: lesson *n* is taught at the
 - Google Drive: Drive-link attachments.
 
 ## Current limitations
-- **No server yet.** Data lives in one browser. Team members and permissions work for teachers using the same device or a shared backup, but real multi-device collaboration and public share links need a backend with accounts.
+- **No server yet.** Your own planner syncs between your computers through a cloud-drive folder. Team members and permissions work within one planner folder (e.g. a team computer, or a folder a team shares, used by one person at a time). Live multi-teacher editing and public share links need a backend with accounts.
 - **Standards library is a sample.** Certified frameworks for every state and district would have to be licensed or curated and loaded through the CSV import or a future API.
 - **Google integration doesn't use OAuth.** It relies on file export and share links rather than API sync, so there's no automatic Classroom posting or Drive picker yet.
 
@@ -77,3 +130,5 @@ Lessons are stored as an ordered sequence per class: lesson *n* is taught at the
 | `src/lib/reports.js` | Standards coverage, achievement, weighted grade averages |
 | `src/lib/ics.js` | iCalendar export and Google Calendar / Classroom links |
 | `src/pages/*` | One file per screen |
+| `electron/main.cjs` | Desktop shell: planner folder, atomic saves, daily backups, file watching, attachments, auto-update |
+| `electron/preload.cjs` | The narrow bridge (`window.plannerHost`) between the UI and the file system |

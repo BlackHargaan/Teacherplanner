@@ -50,13 +50,12 @@ npm run dist:linux # build installers locally (also dist:win / dist:mac, on that
 
 ### Releasing
 
-Bump `version` in `package.json`, commit, then tag and push:
+Bump `version` in `package.json` (`npm version 0.4.0 --no-git-tag-version`) and commit. Then either:
 
-```bash
-git tag v0.2.0 && git push origin v0.2.0
-```
+- go to **Actions → Desktop installers → Run workflow** and tick **publish**, which tags the commit `v<version>` and publishes the release, or
+- push a tag yourself: `git tag v0.4.0 && git push origin v0.4.0`.
 
-The **Desktop installers** GitHub Action (`.github/workflows/release.yml`) builds Windows, Mac and Linux installers and publishes them, with auto-update metadata, on the Releases page. **Actions → Desktop installers → Run workflow** builds the installers as downloadable artifacts without publishing.
+The **Desktop installers** GitHub Action (`.github/workflows/release.yml`) builds the Windows, Mac and Linux installers and publishes them, with auto-update metadata, on the Releases page. Installed copies update themselves to the newest release. Running the workflow without **publish** only builds the installers as downloadable artifacts.
 
 To remove the security prompts, add code signing:
 - **Mac:** an Apple Developer account (US$99/yr). Set the `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD` and `APPLE_TEAM_ID` secrets for notarization.

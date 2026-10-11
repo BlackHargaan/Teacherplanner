@@ -1,12 +1,13 @@
+/* Palette: --accent-light / --accent-dark are set from Settings → Appearance. */
 :root {
-  --bg: #f4f6fb;
+  --accent: var(--accent-light, #2563eb);
+  --accent-text: #ffffff;
+  --bg: color-mix(in srgb, var(--accent) 5%, #f5f6f9);
   --surface: #ffffff;
-  --surface-2: #f8fafc;
-  --border: #e2e8f0;
+  --surface-2: color-mix(in srgb, var(--accent) 4%, #f8fafc);
+  --border: color-mix(in srgb, var(--accent) 8%, #e2e8f0);
   --text: #0f172a;
   --muted: #64748b;
-  --accent: #2563eb;
-  --accent-text: #ffffff;
   --danger: #dc2626;
   --shadow: 0 1px 2px rgba(15, 23, 42, 0.06), 0 4px 12px rgba(15, 23, 42, 0.05);
   --radius: 10px;
@@ -15,17 +16,32 @@
   font-size: 15px;
 }
 @media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0b1120;
-    --surface: #111827;
-    --surface-2: #1e293b;
-    --border: #334155;
+  :root:not([data-mode="light"]) {
+    --accent: var(--accent-dark, #60a5fa);
+    --accent-text: #0b1120;
+    --bg: color-mix(in srgb, var(--accent) 5%, #0b1120);
+    --surface: color-mix(in srgb, var(--accent) 3%, #111827);
+    --surface-2: color-mix(in srgb, var(--accent) 6%, #1e293b);
+    --border: color-mix(in srgb, var(--accent) 10%, #334155);
     --text: #e2e8f0;
     --muted: #94a3b8;
-    --accent: #3b82f6;
     --shadow: none;
+    --sec-mix: 55%;
     color-scheme: dark;
   }
+}
+:root[data-mode="dark"] {
+  --accent: var(--accent-dark, #60a5fa);
+  --accent-text: #0b1120;
+  --bg: color-mix(in srgb, var(--accent) 5%, #0b1120);
+  --surface: color-mix(in srgb, var(--accent) 3%, #111827);
+  --surface-2: color-mix(in srgb, var(--accent) 6%, #1e293b);
+  --border: color-mix(in srgb, var(--accent) 10%, #334155);
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --shadow: none;
+  --sec-mix: 55%;
+  color-scheme: dark;
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--text); }
@@ -39,6 +55,9 @@ input, select, textarea, button, .btn {
   border-radius: 7px; padding: 0.4rem 0.6rem;
 }
 textarea { width: 100%; resize: vertical; }
+input[type="color"] { width: 2.4rem; height: 2rem; padding: 2px; cursor: pointer; }
+/* Section colors stay readable on dark backgrounds by mixing toward the text color. */
+.sec-text { color: color-mix(in srgb, var(--sec, var(--text)) calc(100% - var(--sec-mix, 0%)), var(--text)); }
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 button, .btn { cursor: pointer; background: var(--surface-2); display: inline-flex; align-items: center; gap: 0.3rem; text-decoration: none; white-space: nowrap; }
 button:hover:not(:disabled), .btn:hover { border-color: var(--accent); }
@@ -219,6 +238,10 @@ button.seat.seat-off { border: 2px dashed var(--border); opacity: 0.4; }
 }
 
 @media print {
+  :root, :root[data-mode="dark"], :root:not([data-mode="light"]) {
+    --bg: #fff; --surface: #fff; --surface-2: #f8fafc; --border: #cbd5e1; --text: #000; --muted: #475569;
+    color-scheme: light;
+  }
   .no-print, .menu, .toast { display: none !important; }
   body { background: #fff; color: #000; }
   .week-grid { overflow: visible; }
@@ -233,3 +256,13 @@ button.seat.seat-off { border: 2px dashed var(--border); opacity: 0.4; }
 .welcome-card code { word-break: break-all; }
 button.big, .btn.big { flex-direction: column; align-items: flex-start; gap: 0.2rem; padding: 0.8rem 1rem; white-space: normal; text-align: left; font-weight: 600; }
 button.big .small, .btn.big .small { font-weight: 400; opacity: 0.85; }
+
+/* appearance picker */
+.palette-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 0.5rem; }
+.palette-option { flex-direction: column; align-items: flex-start; gap: 0.4rem; padding: 0.6rem; background: var(--surface); }
+.palette-option.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.palette-swatches { display: flex; gap: 0.25rem; }
+.palette-swatches span { width: 1.4rem; height: 1.4rem; border-radius: 50%; border: 1px solid rgba(0, 0, 0, 0.1); }
+.segmented { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.segmented button { border: none; border-radius: 0; background: var(--surface); }
+.segmented button.on { background: var(--accent); color: var(--accent-text); }

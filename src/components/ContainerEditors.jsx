@@ -124,7 +124,7 @@ export function SharingEditor({ container, edit }) {
             <tbody>
               {container.sections.map((s) => (
                 <tr key={s.id}>
-                  <td style={{ color: s.color }}>{s.name}</td>
+                  <td className="sec-text" style={{ '--sec': s.color }}>{s.name}</td>
                   {shared.map((u) => (
                     <td key={u.id}>
                       <select value={container.sectionPermissions?.[s.id]?.[u.id] || ''} onChange={(e) => setSecPerm(s.id, u.id, e.target.value)}>

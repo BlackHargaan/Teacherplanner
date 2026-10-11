@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import { host, useStore } from './lib/store.jsx';
+import { applyAppearance } from './data/themes.js';
 import Welcome from './pages/Welcome.jsx';
 import { useHashRoute } from './lib/router.js';
 import { currentUser } from './lib/model.js';
@@ -31,6 +33,8 @@ const PAGES = [
 export default function App() {
   const { state, update, toast, year } = useStore();
   const [route, param] = useHashRoute();
+  const appearance = state ? currentUser(state)?.appearance : undefined;
+  useEffect(() => { applyAppearance(appearance); }, [appearance?.palette, appearance?.mode]);
   if (host && !state) return <><Welcome /><Toast toast={toast} /></>;
   if (route === 'view') return <>{<Viewer id={param} />}<Toast toast={toast} /></>;
   const [id, , Page] = PAGES.find(([p]) => p === route) || PAGES[0];

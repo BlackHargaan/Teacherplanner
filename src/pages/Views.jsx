@@ -203,7 +203,8 @@ function SnapshotButton({ view }) {
   const go = () => {
     const html = renderToStaticMarkup(<StoreContext.Provider value={ctx}><ViewContent view={view} /></StoreContext.Provider>);
     const css = Array.from(document.styleSheets).flatMap((s) => { try { return Array.from(s.cssRules).map((r) => r.cssText); } catch { return []; } }).join('\n');
-    const page = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${view.name}</title><style>${css}</style></head><body class="snapshot"><main class="viewer">${html}<p class="small muted">Snapshot generated ${new Date().toLocaleString()}</p></main></body></html>`;
+    const root = document.documentElement;
+    const page = `<!doctype html><html${root.dataset.mode ? ` data-mode="${root.dataset.mode}"` : ''} style="${root.style.cssText}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${view.name}</title><style>${css}</style></head><body class="snapshot"><main class="viewer">${html}<p class="small muted">Snapshot generated ${new Date().toLocaleString()}</p></main></body></html>`;
     download(`${view.name.replace(/[^\w-]+/g, '-')}-${today()}.html`, page, 'text/html');
   };
   return <button onClick={go}>Download page</button>;

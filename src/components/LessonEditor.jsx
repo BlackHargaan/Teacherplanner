@@ -197,12 +197,13 @@ export default function LessonEditor({ containerId, index, date, meeting, onClos
             const { before, after } = templateTextFor(activeTemplates, sec);
             return (
               <div key={sec.id} className="field">
-                <span className="field-label" style={{ color: sec.color }}>
+                <span className="field-label sec-text" style={{ '--sec': sec.color }}>
                   {sec.name} {access === 'view' && <span className="muted small">(view only)</span>}
                 </span>
                 {before.map((b) => <div key={b.templateId} className="lc-template">{b.text} <span className="muted small">— {b.name}</span></div>)}
                 <textarea
                   rows={3}
+                  className="sec-text"
                   style={sectionStyle(sec)}
                   value={draft.content[sec.id] || ''}
                   disabled={!editable || access !== 'edit'}

@@ -17,7 +17,8 @@ export function StatusChips({ ids }) {
 }
 
 export function sectionStyle(sec) {
-  return { color: sec.color, fontFamily: sec.font, fontSize: sec.size, fontWeight: sec.bold ? 700 : undefined };
+  // Color goes through --sec so dark mode can lighten it (see .sec-text in styles.css).
+  return { '--sec': sec.color, fontFamily: sec.font, fontSize: sec.size, fontWeight: sec.bold ? 700 : undefined };
 }
 
 /**
@@ -40,8 +41,8 @@ export function LessonContent({ lesson, cls, opts = {} }) {
     if (!text && !before.length && !after.length) return null;
     return (
       <div key={sec.id} className="lc-section">
-        <div className="lc-sec-name" style={{ color: sec.color }}>{sec.name}</div>
-        <div className="lc-sec-body" style={sectionStyle(sec)}>
+        <div className="lc-sec-name sec-text" style={{ '--sec': sec.color }}>{sec.name}</div>
+        <div className="lc-sec-body sec-text" style={sectionStyle(sec)}>
           {before.map((b) => <div key={b.templateId} className="lc-template" title={`From template: ${b.name}`}>{b.text}</div>)}
           {text && <div className="pre">{text}</div>}
           {after.map((b) => <div key={b.templateId} className="lc-template" title={`From template: ${b.name}`}>{b.text}</div>)}

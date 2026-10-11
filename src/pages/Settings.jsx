@@ -3,12 +3,17 @@ import { host, useStore, resetToDemo, resetToEmpty } from '../lib/store.jsx';
 import { uid } from '../lib/model.js';
 import { download } from '../components/ui.jsx';
 import { today } from '../lib/dates.js';
+import { MODES, PALETTES } from '../data/themes.js';
 
 export default function Settings() {
   const { state, update, replace, notify, userId, vault, openVault } = useStore();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const me = state.users.find((u) => u.id === userId);
+  const setAppearance = (patch) => update((d) => {
+    const u = d.users.find((x) => x.id === userId);
+    u.appearance = { ...(u.appearance || {}), ...patch };
+  });
 
   const importBackup = (e) => {
     const file = e.target.files[0];
@@ -31,6 +36,32 @@ export default function Settings() {
     <div className="page">
       <div className="page-head"><h1>Settings</h1></div>
       <div className="cards">
+        <section className="card wide">
+          <h2>Appearance</h2>
+          <div className="palette-grid">
+            {PALETTES.map((p) => (
+              <button
+                key={p.id}
+                className={`palette-option ${(me.appearance?.palette || 'classic') === p.id ? 'on' : ''}`}
+                onClick={() => setAppearance({ palette: p.id })}
+                aria-pressed={(me.appearance?.palette || 'classic') === p.id}
+              >
+                <span className="palette-swatches"><span style={{ background: p.light }} /><span style={{ background: p.dark }} /></span>
+                {p.name}
+              </button>
+            ))}
+          </div>
+          <div className="row wrap">
+            <span className="small">Light or dark</span>
+            <div className="segmented" role="group" aria-label="Light or dark">
+              {MODES.map(([id, label]) => (
+                <button key={id} className={(me.appearance?.mode || 'auto') === id ? 'on' : ''} onClick={() => setAppearance({ mode: id })}>{label}</button>
+              ))}
+            </div>
+          </div>
+          <p className="small muted">Your colors are saved with your profile. Class and lesson-section colors are set on the Classes page.</p>
+        </section>
+
         <section className="card">
           <h2>My profile</h2>
           <div className="row"><input value={me.name} onChange={(e) => update((d) => { d.users.find((u) => u.id === userId).name = e.target.value; })} /></div>

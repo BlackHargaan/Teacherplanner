@@ -6,7 +6,7 @@ Teacher Planner is a **desktop app for Windows, Mac and Linux**. Like Obsidian, 
 
 ## Installing (for teachers)
 
-1. Go to the **[Releases page](https://github.com/BlackHargaan/Teacherplanner/releases/latest)** and download the file for your computer:
+1. Go to **[the Teacher Planner website](https://blackhargaan.github.io/Teacherplanner/)** and click **Download**. It picks the right installer for your computer:
    - **Windows:** `Teacher-Planner-…-win-x64.exe`. Double-click it. It installs in a few seconds, with no admin rights needed, and adds a desktop shortcut.
    - **Mac:** `Teacher-Planner-…-mac-universal.dmg`. Open it and drag Teacher Planner into Applications.
    - **Linux:** the `.AppImage` (make it executable, then run it) or the `.deb`.
@@ -47,6 +47,15 @@ npm run desktop    # build and run the desktop app
 npm test           # schedule engine, sequencing, reports, CSV, iCalendar
 npm run dist:linux # build installers locally (also dist:win / dist:mac, on that OS)
 ```
+
+### Website
+
+The landing page teachers download from lives in `site/`. It's plain HTML, CSS and JS with no build step, and is published to GitHub Pages by `.github/workflows/site.yml` whenever `site/` changes.
+- **Download buttons:** they look up the newest release when the page loads and link to the right installer for the visitor's computer, so a new release needs no site changes.
+- **Preview locally:** `python3 -m http.server --directory site`.
+- **Screenshots:** they're in `site/assets/`. Retake them when the app's look changes.
+- **One-time setup:** in the repo's **Settings → Pages**, set *Source* to **GitHub Actions**.
+- **Custom domain (optional):** add it under Settings → Pages, and add a `site/CNAME` file containing the domain.
 
 ### Releasing
 

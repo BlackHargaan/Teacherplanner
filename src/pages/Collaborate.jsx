@@ -97,7 +97,7 @@ function BankDetail({ bank, onLink }) {
                           <button className="icon-btn" title="Delete" onClick={() => {
                             if (usedIn.length && !window.confirm(`This lesson is linked into ${usedIn.join(', ')}. Delete it from the bank anyway? (Linked copies stay in those classes.)`)) return;
                             update((d) => { editSequence(d, bank.id, (s) => pullBack(s, i)); pruneOrphans(d); });
-                            notify('Lesson removed from bank');
+                            notify('Lesson removed from bank', { undo: true });
                           }}>✕</button>
                         </>
                       )}

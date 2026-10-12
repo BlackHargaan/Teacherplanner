@@ -63,15 +63,21 @@ export function clearAt(seq, index) {
 }
 
 /**
- * Move a lesson within the same sequence. The original day is left empty and
- * the lesson is inserted at the target, bumping what was there forward.
+ * Move a lesson within the same sequence. The original day is left empty. If
+ * the target day is empty the lesson simply goes there; otherwise it's
+ * inserted, bumping the lesson already there (and later ones) forward.
  */
 export function move(seq, from, to) {
   const id = seq[from];
   if (id == null || from === to) return [...seq];
   const cleared = [...seq];
   cleared[from] = null;
-  return insertAt(cleared, to, id);
+  return placeOrInsert(cleared, to, id);
+}
+
+/** Put a lesson on a day: fill it if empty, otherwise insert and bump forward. */
+export function placeOrInsert(seq, index, lessonId) {
+  return seq[index] == null ? place(seq, index, lessonId) : insertAt(seq, index, lessonId);
 }
 
 /** Swap two slots. */

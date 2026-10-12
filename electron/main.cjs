@@ -87,6 +87,22 @@ function writeData(json) {
   backupToday(json);
 }
 
+const BACKUP_NAME = /^planner-(\d{4}-\d{2}-\d{2})(?:-before-restore-(\d{6}))?\.json$/;
+
+/** Daily backups plus the safety copies taken before a restore, newest first. */
+function listBackups() {
+  const dir = path.join(vaultPath, 'backups');
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir)
+    .map((file) => ({ file, m: file.match(BACKUP_NAME) }))
+    .filter((x) => x.m)
+    .map(({ file, m }) => {
+      const st = fs.statSync(path.join(dir, file));
+      return { file, date: m[1], beforeRestore: !!m[2], size: st.size, savedAt: st.mtimeMs };
+    })
+    .sort((a, b) => b.savedAt - a.savedAt);
+}
+
 function backupToday(json) {
   const dir = path.join(vaultPath, 'backups');
   const day = new Date().toISOString().slice(0, 10);
@@ -161,6 +177,46 @@ ipcMain.on('vault:save-sync', (e, json) => {
   try { if (vaultPath) { writeData(json); tellOthers(e.sender); } e.returnValue = true; } catch { e.returnValue = false; }
 });
 
+ipcMain.handle('vault:list-backups', () => (vaultPath ? listBackups() : []));
+ipcMain.handle('vault:read-backup', (_e, file) => {
+  if (!BACKUP_NAME.test(file)) throw new Error('Not a backup file');
+  return fs.readFileSync(path.join(vaultPath, 'backups', file), 'utf8');
+});
+// Keep a copy of the current planner before it's replaced by a backup.
+ipcMain.handle('vault:snapshot-before-restore', () => {
+  if (!vaultPath || !fs.existsSync(dataPath())) return null;
+  const now = new Date();
+  const stamp = now.toTimeString().slice(0, 8).replace(/:/g, '');
+  const file = `planner-${now.toISOString().slice(0, 10)}-before-restore-${stamp}.json`;
+  fs.copyFileSync(dataPath(), path.join(vaultPath, 'backups', file));
+  const extra = listBackups().filter((b) => b.beforeRestore).slice(10);
+  for (const b of extra) fs.rmSync(path.join(vaultPath, 'backups', b.file), { force: true });
+  return file;
+});
+
+// Save the page that asked (a printable plan) as a PDF.
+const LETTER_COUNTRIES = new Set(['US', 'CA', 'MX', 'PH', 'CL', 'CO', 'VE', 'GT', 'CR', 'PA', 'DO', 'PR']);
+let lastPdf = null;
+ipcMain.handle('pdf:save', async (e, fileName) => {
+  const win = BrowserWindow.fromWebContents(e.sender);
+  const safe = String(fileName || 'Teacher Planner.pdf').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_');
+  const res = await dialog.showSaveDialog(win, {
+    title: 'Save as PDF',
+    defaultPath: path.join(app.getPath('documents'), safe),
+    filters: [{ name: 'PDF', extensions: ['pdf'] }],
+  });
+  if (res.canceled || !res.filePath) return null;
+  const pdf = await e.sender.printToPDF({
+    printBackground: true,
+    pageSize: LETTER_COUNTRIES.has(app.getLocaleCountryCode()) ? 'Letter' : 'A4',
+    margins: { top: 0.5, bottom: 0.5, left: 0.5, right: 0.5 },
+  });
+  fs.writeFileSync(res.filePath, pdf);
+  lastPdf = res.filePath;
+  return res.filePath;
+});
+ipcMain.handle('pdf:open-last', () => lastPdf && shell.openPath(lastPdf));
+
 ipcMain.handle('vault:save-attachment', (_e, { name, data }) => {
   const dir = path.join(vaultPath, 'attachments');
   fs.mkdirSync(dir, { recursive: true });
@@ -234,6 +290,11 @@ function checkFromMenu() {
   updates.check();
 }
 
+function sendCommand(cmd) {
+  const win = BrowserWindow.getFocusedWindow() || mainWindow;
+  win?.webContents.send('app:command', cmd);
+}
+
 function buildMenu() {
   const isMac = process.platform === 'darwin';
   Menu.setApplicationMenu(Menu.buildFromTemplate([
@@ -247,7 +308,21 @@ function buildMenu() {
         isMac ? { role: 'close' } : { role: 'quit' },
       ],
     },
-    { role: 'editMenu' },
+    {
+      label: 'Edit',
+      submenu: [
+        // Undo/Redo act on the planner, or on the text box being typed in.
+        { label: 'Undo', accelerator: 'CmdOrCtrl+Z', click: () => sendCommand('undo') },
+        { label: 'Redo', accelerator: process.platform === 'win32' ? 'Ctrl+Y' : 'Shift+CmdOrCtrl+Z', click: () => sendCommand('redo') },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' },
+        { type: 'separator' },
+        { label: 'Find Lessons…', accelerator: 'CmdOrCtrl+F', click: () => sendCommand('find') },
+      ],
+    },
     { role: 'viewMenu' },
     { role: 'windowMenu' },
     {

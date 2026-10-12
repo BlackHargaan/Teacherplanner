@@ -90,7 +90,7 @@ export default function Templates() {
                 }
               });
               setSelected(null);
-              notify('Template deleted');
+              notify('Template deleted', { undo: true });
             }}>Delete template</button>
           </div>
         </section>

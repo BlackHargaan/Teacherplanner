@@ -3,7 +3,8 @@ import { UpdatesCard } from '../components/Updates.jsx';
 import { useHashRoute } from '../lib/router.js';
 import { host, useStore, resetToDemo, resetToEmpty } from '../lib/store.jsx';
 import { uid } from '../lib/model.js';
-import { download } from '../components/ui.jsx';
+import { Modal, download } from '../components/ui.jsx';
+import { formatDate } from '../lib/dates.js';
 import { today } from '../lib/dates.js';
 import { MODES, PALETTES } from '../data/themes.js';
 
@@ -13,6 +14,7 @@ export default function Settings() {
   const [email, setEmail] = useState('');
   const me = state.users.find((u) => u.id === userId);
   const [, section] = useHashRoute();
+  const [restoring, setRestoring] = useState(false);
   useEffect(() => {
     if (section) document.getElementById(section)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [section]);
@@ -140,6 +142,7 @@ export default function Settings() {
                   await openVault(info);
                   notify(info.hasData ? 'Opened planner folder' : 'Planner moved to the new folder');
                 }}>Move / switch folder…</button>
+                <button onClick={() => setRestoring(true)}>Restore an earlier version…</button>
               </div>
             </>
           ) : (
@@ -150,11 +153,56 @@ export default function Settings() {
             <label className="btn">Import backup<input type="file" accept="application/json,.json" hidden onChange={importBackup} /></label>
           </div>
           <div className="row wrap">
-            <button onClick={() => { if (window.confirm('Replace everything with sample data?')) replace(resetToDemo()); }}>Load sample data</button>
-            <button className="danger" onClick={() => { if (window.confirm('Erase everything and start fresh? Export a backup first if you need it.')) replace(resetToEmpty()); }}>Start fresh</button>
+            <button onClick={() => { if (window.confirm('Replace everything with sample data?')) { replace(resetToDemo()); notify('Loaded the sample planner.', { undo: true }); } }}>Load sample data</button>
+            <button className="danger" onClick={() => { if (window.confirm('Erase everything and start fresh?')) { replace(resetToEmpty()); notify('Started a fresh planner.', { undo: true }); } }}>Start fresh</button>
           </div>
         </section>
       </div>
+      {restoring && <RestoreDialog onClose={() => setRestoring(false)} />}
     </div>
+  );
+}
+
+/** Pick a daily backup (or a pre-restore safety copy) and bring it back. */
+function RestoreDialog({ onClose }) {
+  const { replace, notify } = useStore();
+  const [backups, setBackups] = useState(null);
+  const [busy, setBusy] = useState(null);
+  useEffect(() => { host.listBackups().then(setBackups).catch(() => setBackups([])); }, []);
+
+  const restore = async (b) => {
+    const when = formatDate(b.date, { weekday: 'long', month: 'long', day: 'numeric' });
+    if (!window.confirm(`Replace your planner with the version from ${when}? Your current planner is kept as a backup, and you can also undo right after.`)) return;
+    setBusy(b.file);
+    try {
+      const data = JSON.parse(await host.readBackup(b.file));
+      if (!data.years || !data.classes || !data.lessons) throw new Error('not a planner');
+      await host.snapshotBeforeRestore();
+      replace(data);
+      notify(`Restored your planner from ${when}.`, { undo: true });
+      onClose();
+    } catch {
+      notify('That backup could not be read.', true);
+      setBusy(null);
+    }
+  };
+
+  return (
+    <Modal title="Restore an earlier version" onClose={onClose}>
+      <p className="small">Teacher Planner saves a copy of your planner each day you use it and keeps the last 30 days. Restoring replaces everything — classes, lessons and grades — with that day’s copy.</p>
+      {backups === null && <p className="small muted">Loading…</p>}
+      {backups?.length === 0 && <p className="small muted">No backups yet. One is made the first time you change something each day.</p>}
+      <ul className="list">
+        {backups?.map((b) => (
+          <li key={b.file}>
+            <span className="grow">
+              <strong>{formatDate(b.date, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</strong>
+              <span className="small muted"> · {b.beforeRestore ? `saved before a restore at ${new Date(b.savedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : 'daily backup'} · {Math.max(1, Math.round(b.size / 1024))} KB</span>
+            </span>
+            <button disabled={!!busy} onClick={() => restore(b)}>{busy === b.file ? 'Restoring…' : 'Restore'}</button>
+          </li>
+        ))}
+      </ul>
+    </Modal>
   );
 }

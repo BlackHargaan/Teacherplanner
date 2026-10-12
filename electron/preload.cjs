@@ -20,6 +20,16 @@ contextBridge.exposeInMainWorld('plannerHost', {
       return () => ipcRenderer.removeListener('update:status', listener);
     },
   },
+  listBackups: () => ipcRenderer.invoke('vault:list-backups'),
+  readBackup: (file) => ipcRenderer.invoke('vault:read-backup', file),
+  snapshotBeforeRestore: () => ipcRenderer.invoke('vault:snapshot-before-restore'),
+  savePdf: (fileName) => ipcRenderer.invoke('pdf:save', fileName),
+  openLastPdf: () => ipcRenderer.invoke('pdf:open-last'),
+  onCommand: (cb) => {
+    const listener = (_e, cmd) => cb(cmd);
+    ipcRenderer.on('app:command', listener);
+    return () => ipcRenderer.removeListener('app:command', listener);
+  },
   onNavigate: (cb) => {
     const listener = (_e, path) => cb(path);
     ipcRenderer.on('app:navigate', listener);

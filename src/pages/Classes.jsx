@@ -33,7 +33,7 @@ export default function Classes() {
       pruneOrphans(d);
     });
     setSelected(null);
-    notify('Class deleted');
+    notify('Class deleted', { undo: true });
   };
 
   return (

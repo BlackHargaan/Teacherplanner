@@ -83,9 +83,19 @@ The first launch can load sample data (three classes, a colleague's shared lesso
 - **Alternate day schedules** (half day, assembly, planning day) with their own class times. On a cycle schedule you choose whether each one counts as a cycle day.
 - Per-day changes from the planner: **add an extra class** or **remove a class** from one day.
 - Lesson actions: **bump**, **extend**, **move**, **copy**, **link**, **clear**, **delete & pull back**, plus reordering in the Class list view.
+- **Drag and drop** in the week view: drag a lesson to another day of the same class to move it, or onto another class to copy it.
 - **Re-use for next year**: copies classes, sections, meeting times, templates, alternate days and holidays (shifted a year), and optionally lessons in order.
 
 Lessons are stored as an ordered sequence per class: lesson *n* is taught at the class's *n*-th meeting. Add a snow day, remove a class or add an extra one, and every later lesson shifts automatically.
+
+### Search, undo and printable plans
+- **Search** (top bar, or <kbd>Ctrl</kbd>+<kbd>K</kbd>, <kbd>/</kbd>, or Edit → Find Lessons) looks through every lesson in every school year: titles, section text, standards, strategies, attachments and your private notes. Each result links to the days the lesson is taught.
+- **Undo / redo** for any change (<kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>, the Edit menu, or the **Undo** button on the confirmation message). Quick successive edits, like typing, count as one step.
+- **Restore an earlier version** (Settings → Data, desktop app): choose any of the last 30 daily backups. A safety copy of the current planner is kept first.
+- **Weekly lesson plans** and **sub plan packets**, from the planner's **Print / PDF** menu or a day's ⋯ menu.
+  - The weekly plans can be arranged by day or by class, with options for lesson details, standards and supports.
+  - The sub packet has notes for the day, the schedule, each class's lesson, notes for the sub, the class list with student notes, and the seating chart.
+  - The desktop app saves real PDF files (Letter or A4 to match the computer's region). The browser version prints, or saves via "Save as PDF".
 
 ### Lesson development
 - Up to **10 sections** per class/bank, with preset layouts (Standard, 5E, Madeline Hunter, Gradual Release, Workshop, UbD, Simple). Each section has its own color, font (including any custom font name), size and bold setting, and can be shown or hidden.

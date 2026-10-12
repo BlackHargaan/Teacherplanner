@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { demoState, emptyState, currentYear, yearClasses } from './model.js';
 import { buildCalendar } from './schedule.js';
+import { createHistory, record, undo as undoStep, redo as redoStep } from './history.js';
 
 const KEY = 'teacher-planner:v1';
 export const StoreContext = createContext(null);
@@ -35,9 +36,14 @@ export function StoreProvider({ children }) {
   const saveTimer = useRef();
   const latest = useRef(state);
   const skipSave = useRef(true);
+  const history = useRef(createHistory());
   latest.current = state;
 
-  const notify = useCallback((text, error = false) => setToast({ text, error }), []);
+  /** notify(text) · notify(text, true) for errors · notify(text, { undo: true }) to offer Undo */
+  const notify = useCallback((text, opts = false) => {
+    const o = typeof opts === 'boolean' ? { error: opts } : opts;
+    setToast({ text, error: !!o.error, undo: !!o.undo, action: o.action, id: Date.now() });
+  }, []);
 
   // ---- desktop: open the planner folder
   const openVault = useCallback(async (info) => {
@@ -45,6 +51,7 @@ export function StoreProvider({ children }) {
     if (!info?.vaultPath) return;
     const raw = await host.load();
     skipSave.current = !!raw; // freshly loaded data doesn't need writing back
+    history.current = createHistory();
     try {
       setState(raw ? migrate(JSON.parse(raw)) : null);
     } catch {
@@ -59,6 +66,7 @@ export function StoreProvider({ children }) {
       const raw = await host.load();
       if (!raw) return;
       skipSave.current = true;
+      history.current = createHistory();
       setState(migrate(JSON.parse(raw)));
       setToast({ text: 'Planner updated with changes from another computer.' });
     });
@@ -95,28 +103,56 @@ export function StoreProvider({ children }) {
 
   useEffect(() => {
     if (!toast) return undefined;
-    const t = setTimeout(() => setToast(null), 3500);
+    const t = setTimeout(() => setToast(null), toast.undo || toast.action ? 6000 : 3500);
     return () => clearTimeout(t);
   }, [toast]);
 
-  /** Apply a mutation to a deep copy of state. */
+  /** Apply a mutation to a deep copy of state (undoable). */
   const update = useCallback((fn) => {
-    setState((prev) => {
-      const draft = structuredClone(prev);
-      fn(draft);
-      return draft;
-    });
+    const prev = latest.current;
+    const draft = structuredClone(prev);
+    fn(draft);
+    history.current = record(history.current, prev);
+    latest.current = draft;
+    setState(draft);
   }, []);
 
-  const replace = useCallback((next) => { skipSave.current = false; setState(migrate(next)); }, []);
+  /** Swap in a whole planner (restore, import, sample data) — also undoable. */
+  const replace = useCallback((next) => {
+    if (latest.current) history.current = record(history.current, latest.current, Date.now(), true);
+    skipSave.current = false;
+    latest.current = migrate(next);
+    setState(latest.current);
+  }, []);
+
+  const undo = useCallback(() => {
+    const r = undoStep(history.current, latest.current);
+    if (!r) return false;
+    history.current = r.history;
+    skipSave.current = false;
+    latest.current = r.state;
+    setState(r.state);
+    setToast(null);
+    return true;
+  }, []);
+
+  const redo = useCallback(() => {
+    const r = redoStep(history.current, latest.current);
+    if (!r) return false;
+    history.current = r.history;
+    skipSave.current = false;
+    latest.current = r.state;
+    setState(r.state);
+    return true;
+  }, []);
 
   const year = state ? currentYear(state) : null;
   const classes = useMemo(() => (state ? yearClasses(state, year?.id) : []), [state?.classes, year?.id]);
   const calendar = useMemo(() => (year ? buildCalendar(year, classes) : null), [year, classes]);
 
   const value = useMemo(
-    () => ({ state, update, replace, notify, toast, year, classes, calendar, userId: state?.currentUserId, vault, openVault }),
-    [state, update, replace, notify, toast, year, classes, calendar, vault, openVault],
+    () => ({ state, update, replace, undo, redo, notify, toast, year, classes, calendar, userId: state?.currentUserId, vault, openVault }),
+    [state, update, replace, undo, redo, notify, toast, year, classes, calendar, vault, openVault],
   );
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }

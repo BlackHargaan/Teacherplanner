@@ -107,7 +107,7 @@ export default function Views() {
             <div className="row wrap">
               <a className="btn primary" href={`#/view/${view.id}`} target="_blank" rel="noreferrer">Open view</a>
               <SnapshotButton view={view} />
-              <button className="danger" onClick={() => { update((d) => { d.views = d.views.filter((v) => v.id !== view.id); }); setSelected(null); notify('View deleted'); }}>Delete</button>
+              <button className="danger" onClick={() => { update((d) => { d.views = d.views.filter((v) => v.id !== view.id); }); setSelected(null); notify('View deleted', { undo: true }); }}>Delete</button>
             </div>
             <p className="small muted">“Open view” shows the read-only page in this browser (e.g. on a classroom display or sub laptop). “Download page” saves a self-contained HTML file you can email, post to your LMS, or upload to Google Drive.</p>
           </div>

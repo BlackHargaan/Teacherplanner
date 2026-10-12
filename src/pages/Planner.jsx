@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { navigate, useHashRoute } from '../lib/router.js';
 import { useStore } from '../lib/store.jsx';
 import { canEdit, canView, uid } from '../lib/model.js';
-import { bump, clearAt, extend, insertAt, move, pullBack, swap } from '../lib/sequence.js';
+import { bump, clearAt, extend, insertAt, move, placeOrInsert, pullBack, swap } from '../lib/sequence.js';
 import { copyLesson, editSequence, pruneOrphans } from '../lib/actions.js';
 import { addDays, formatDate, formatTime, planningAnchor, startOfWeek, today, DOW_LONG } from '../lib/dates.js';
 import { dayKeyLabel, isNonSchoolDay, meetingIndexOnOrAfter, weekDates } from '../lib/schedule.js';
@@ -21,6 +22,22 @@ export default function Planner() {
   const [dialog, setDialog] = useState(null);
   const [detail, setDetail] = useState(true);
   const [focusClass, setFocusClass] = useState(null);
+  const [, rDate, rClass, rIndex] = useHashRoute();
+
+  // Deep links (e.g. from search): jump to the date and open the lesson.
+  useEffect(() => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(rDate || '')) return;
+    setAnchor(rDate);
+    if (mode === 'class') setMode('week');
+    if (rClass && rIndex != null && calendar.byClass[rClass]) {
+      const meeting = calendar.byClass[rClass][Number(rIndex)];
+      setEditing({ containerId: rClass, index: Number(rIndex), date: meeting?.date || rDate, meeting });
+    }
+  }, [rDate, rClass, rIndex]);
+  const closeEditor = () => {
+    setEditing(null);
+    if (rClass) window.location.replace(`#/planner/${rDate}`);
+  };
 
   const visible = classes.filter((c) => canView(c, userId));
   const shown = visible.filter((c) => !hidden.includes(c.id));
@@ -47,7 +64,17 @@ export default function Planner() {
           ))}
         </div>
         <label className="row small"><input type="checkbox" checked={detail} onChange={(e) => setDetail(e.target.checked)} /> Details</label>
-        <button onClick={() => window.print()}>Print</button>
+        <Menu
+          className="print-menu"
+          title="Print / PDF"
+          label="Print / PDF ▾"
+          items={[
+            { label: 'Weekly lesson plans (PDF)…', onClick: () => navigate(`print/week/${anchor}`) },
+            { label: `Sub plans for ${formatDate(firstSchoolDay(calendar, anchor), { weekday: 'short', month: 'short', day: 'numeric' })} (PDF)…`, onClick: () => navigate(`print/sub/${firstSchoolDay(calendar, anchor)}`) },
+            '-',
+            { label: 'Print this screen', onClick: () => window.print() },
+          ]}
+        />
       </div>
 
       {visible.length === 0 && (
@@ -80,12 +107,21 @@ export default function Planner() {
         </div>
       )}
 
-      {editing && <LessonEditor {...editing} onClose={() => setEditing(null)} />}
+      {editing && <LessonEditor {...editing} onClose={closeEditor} />}
       {dialog?.kind === 'target' && <TargetDialog {...dialog} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'extra' && <ExtraClassDialog {...dialog} onClose={() => setDialog(null)} />}
     </div>
   );
 }
+
+/** The first school day on or after `date` (or `date` itself if none). */
+function firstSchoolDay(calendar, date) {
+  return calendar.days.find((d) => d.date >= date)?.date || date;
+}
+
+// The lesson being dragged. HTML drag events don't expose their data until the
+// drop, so the source lives here while a drag is in progress.
+let dragSource = null;
 
 function DayColumn({ date, day, shownIds, detail, onOpen, onDialog }) {
   const { year } = useStore();
@@ -123,6 +159,7 @@ function DayMenu({ date, day, removed, onDialog }) {
     <Menu
       title="Day options"
       items={[
+        { label: 'Sub plans for this day (PDF)…', onClick: () => navigate(`print/sub/${date}`) },
         { label: '+ Add extra class', onClick: () => onDialog({ kind: 'extra', date }) },
         '-',
         ...((year.dayTypes || []).map((t) => ({ label: `${day.dayType?.id === t.id ? '✓ ' : ''}Make “${t.name}”`, onClick: () => setDayType(t.id) }))),
@@ -131,7 +168,7 @@ function DayMenu({ date, day, removed, onDialog }) {
         removed.length > 0 && '-',
         ...removed.map((o) => ({
           label: `Restore ${classes.find((c) => c.id === o.classId)?.name}`,
-          onClick: () => { update((d) => { const y = d.years.find((x) => x.id === year.id); y.overrides = y.overrides.filter((x) => x.id !== o.id); }); notify('Class restored'); },
+          onClick: () => { update((d) => { const y = d.years.find((x) => x.id === year.id); y.overrides = y.overrides.filter((x) => x.id !== o.id); }); notify('Class restored', { undo: true }); },
         })),
       ]}
     />
@@ -145,18 +182,70 @@ function MeetingCard({ m, date, detail, onOpen, onDialog }) {
   const lesson = lessonId ? state.lessons[lessonId] : null;
   const editable = canEdit(cls, userId);
   const linked = lesson && lesson.homeId !== cls.id;
-  const seqOp = (fn, msg) => { update((d) => { editSequence(d, cls.id, fn); pruneOrphans(d); }); notify(msg); };
-  const removeFromDay = () => update((d) => {
-    const y = d.years.find((x) => x.id === year.id);
-    if (m.extra) y.overrides = y.overrides.filter((o) => o.id !== m.overrideId);
-    else y.overrides.push({ id: uid('ov'), date, classId: cls.id, type: 'remove' });
-  });
+  const seqOp = (fn, msg) => { update((d) => { editSequence(d, cls.id, fn); pruneOrphans(d); }); notify(msg, { undo: true }); };
+  const removeFromDay = () => {
+    update((d) => {
+      const y = d.years.find((x) => x.id === year.id);
+      if (m.extra) y.overrides = y.overrides.filter((o) => o.id !== m.overrideId);
+      else y.overrides.push({ id: uid('ov'), date, classId: cls.id, type: 'remove' });
+    });
+    notify(m.extra ? 'Extra class removed' : `${cls.name} removed from this day`, { undo: true });
+  };
+
+  // ---- drag and drop: same class = move, another class = copy
+  const [dropMode, setDropMode] = useState(null);
+  const modeFor = () => {
+    if (!dragSource || !editable) return null;
+    if (dragSource.classId !== cls.id) return 'copy';
+    return dragSource.index === m.index ? null : 'move';
+  };
+  const dragProps = editable && lesson ? {
+    draggable: true,
+    onDragStart: (e) => {
+      dragSource = { classId: cls.id, index: m.index, lessonId, title: lesson.title };
+      e.dataTransfer.effectAllowed = 'copyMove';
+      e.dataTransfer.setData('text/plain', lesson.title || 'Lesson');
+    },
+    onDragEnd: () => { dragSource = null; },
+  } : {};
+  const dropProps = {
+    onDragOver: (e) => {
+      const mode = modeFor();
+      if (!mode) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = mode;
+      if (dropMode !== mode) setDropMode(mode);
+    },
+    onDragLeave: (e) => { if (!e.currentTarget.contains(e.relatedTarget)) setDropMode(null); },
+    onDrop: (e) => {
+      const mode = modeFor();
+      const src = dragSource;
+      dragSource = null;
+      setDropMode(null);
+      if (!mode) return;
+      e.preventDefault();
+      const when = formatDate(date, { weekday: 'short', month: 'short', day: 'numeric' });
+      if (mode === 'move') {
+        update((d) => editSequence(d, cls.id, (s) => move(s, src.index, m.index)));
+        notify(`Moved “${src.title || 'lesson'}” to ${when}`, { undo: true });
+      } else {
+        update((d) => {
+          const id = copyLesson(d, src.lessonId, cls.id, userId);
+          editSequence(d, cls.id, (s) => placeOrInsert(s, m.index, id));
+        });
+        notify(`Copied “${src.title || 'lesson'}” to ${cls.name} on ${when}`, { undo: true });
+      }
+    },
+  };
   const prevExtended = lesson && cls.sequence[m.index - 1] === lessonId;
   const note = state.subNotes?.[date]?.[cls.id];
 
   return (
     <article
-      className={`meeting ${lesson ? '' : 'meeting-empty'}`}
+      {...dragProps}
+      {...dropProps}
+      title={dragProps.draggable ? 'Click to edit · drag to move (or onto another class to copy)' : undefined}
+      className={`meeting ${lesson ? '' : 'meeting-empty'} ${dropMode ? 'drop-over' : ''}`}
       style={{ '--c': cls.color, fontFamily: cls.font, fontSize: cls.fontSize }}
       onClick={() => onOpen({ containerId: cls.id, index: m.index, date, meeting: m })}
       tabIndex={0}
@@ -197,7 +286,9 @@ function MeetingCard({ m, date, detail, onOpen, onDialog }) {
       ) : (
         <div className="muted small">{editable ? '+ Add lesson' : 'No lesson'}</div>
       )}
-      {detail && note && <div className="sub-note small">Sub: {note}</div>}
+      {detail && note && <div className="sub-note small">Sub plan: {note}</div>}
+      {state.subFeedback?.[date]?.[cls.id] && <div className="sub-note feedback-note small">From the sub: {state.subFeedback[date][cls.id]}</div>}
+      {dropMode && <div className="drop-hint">{dropMode === 'move' ? 'Move here' : `Copy to ${cls.name}`}</div>}
     </article>
   );
 }
@@ -220,7 +311,7 @@ function TargetDialog({ action, cls, index, lessonId, onClose }) {
         editSequence(d, targetId, (s) => insertAt(s, to, newId));
       } else editSequence(d, targetId, (s) => insertAt(s, to, lessonId));
     });
-    notify(`${labels[action]}: done`);
+    notify(`${labels[action]}: done`, { undo: true });
     onClose();
   };
 
@@ -254,7 +345,7 @@ function ExtraClassDialog({ date, onClose }) {
   const [end, setEnd] = useState('14:45');
   const add = () => {
     update((d) => d.years.find((y) => y.id === year.id).overrides.push({ id: uid('ov'), date, classId, type: 'add', start, end }));
-    notify('Extra class added — later lessons shift to fill it');
+    notify('Extra class added — later lessons shift to fill it', { undo: true });
     onClose();
   };
   return (

@@ -27,3 +27,9 @@ describe('sequence operations', () => {
     expect(swap(seq, 0, 2)).toEqual(['c', 'b', 'a']);
   });
 });
+
+describe('move onto an empty day', () => {
+  it('places without bumping later lessons', () => {
+    expect(move(['a', null, 'c'], 0, 1)).toEqual([null, 'a', 'c']);
+  });
+});

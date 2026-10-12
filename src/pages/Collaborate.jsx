@@ -9,6 +9,7 @@ import LessonEditor from '../components/LessonEditor.jsx';
 import { SectionsEditor, SharingEditor } from '../components/ContainerEditors.jsx';
 import { StatusChips } from '../components/LessonContent.jsx';
 import { Empty, Field, Modal, Tabs } from '../components/ui.jsx';
+import CloudBankSharing from '../components/CloudBankSharing.jsx';
 
 export default function Collaborate() {
   const { state, update, userId } = useStore();
@@ -33,6 +34,7 @@ export default function Collaborate() {
           <button key={b.id} className={`side-item ${b.id === selected ? 'on' : ''}`} onClick={() => setSelected(b.id)}>
             <span className="dot" style={{ background: b.color }} /> {b.name}
             <span className="badge">{containerRole(b, userId)}</span>
+            {b.cloud && <span className={`badge ${b.cloud.revoked ? '' : 'badge-online'}`} title={b.cloud.revoked ? 'No longer shared with you' : 'Shared online'}>{b.cloud.revoked ? 'removed' : '☁ online'}</span>}
           </button>
         ))}
         {banks.length === 0 && <Empty>No banks yet.</Empty>}
@@ -73,7 +75,12 @@ function BankDetail({ bank, onLink }) {
         <input type="color" value={bank.color} disabled={!editable} onChange={(e) => edit((b) => { b.color = e.target.value; })} />
         <button className="primary" onClick={onLink}>Link into my class…</button>
       </div>
-      <p className="small muted">Owner: {state.users.find((u) => u.id === bank.ownerId)?.name} · Your access: {containerRole(bank, userId)}</p>
+      <p className="small muted">
+        Owner: {bank.cloud ? (bank.cloud.role === 'owner' ? 'you' : bank.cloud.ownerName) : state.users.find((u) => u.id === bank.ownerId)?.name}
+        {' · '}Your access: {containerRole(bank, userId)}
+        {bank.cloud && !bank.cloud.revoked && ' · shared online'}
+      </p>
+      {bank.cloud?.revoked && <div className="notice small">This bank is no longer shared with you — see the Sharing tab.</div>}
       <Tabs value={tab} onChange={setTab} tabs={[['lessons', `Lessons (${bank.sequence.length})`], ['sections', 'Sections'], ['sharing', 'Sharing']]} />
       {tab === 'lessons' && (
         <div className="card">
@@ -111,7 +118,17 @@ function BankDetail({ bank, onLink }) {
         </div>
       )}
       {tab === 'sections' && <fieldset className="plain card" disabled={!editable}><SectionsEditor container={bank} edit={edit} /></fieldset>}
-      {tab === 'sharing' && <div className="card"><SharingEditor container={bank} edit={edit} /></div>}
+      {tab === 'sharing' && (
+        <>
+          <CloudBankSharing bank={bank} isLocalOwner={bank.ownerId === userId} />
+          {!bank.cloud && (
+            <div className="card">
+              <h3>On this computer</h3>
+              <SharingEditor container={bank} edit={edit} />
+            </div>
+          )}
+        </>
+      )}
       {editing && <LessonEditor {...editing} onClose={() => setEditing(null)} />}
     </>
   );

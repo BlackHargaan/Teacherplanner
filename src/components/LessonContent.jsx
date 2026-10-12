@@ -85,6 +85,13 @@ export function attachmentHref(a) {
 }
 
 export function AttachmentLink({ a }) {
+  if (a.localOnly) {
+    return (
+      <span className="attachment attachment-missing" title="This file is on the computer of the teacher who added it. Ask them to share it as a link (e.g. Google Drive).">
+        <span className="att-type">File</span><span>{a.name}</span><span className="small muted">(on a teammate’s computer)</span>
+      </span>
+    );
+  }
   const href = attachmentHref(a);
   const isImage = a.type === 'image' && href;
   return (

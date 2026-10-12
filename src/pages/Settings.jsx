@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { UpdatesCard } from '../components/Updates.jsx';
+import { AccountCard } from '../components/CloudAccount.jsx';
 import { useHashRoute } from '../lib/router.js';
 import { host, useStore, resetToDemo, resetToEmpty } from '../lib/store.jsx';
 import { uid } from '../lib/model.js';
@@ -105,6 +106,7 @@ export default function Settings() {
           </div>
         </section>
 
+        <AccountCard />
         <UpdatesCard />
 
         <section className="card">

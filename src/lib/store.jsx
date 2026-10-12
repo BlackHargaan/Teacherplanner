@@ -117,6 +117,19 @@ export function StoreProvider({ children }) {
     setState(draft);
   }, []);
 
+  /**
+   * Apply changes that came from elsewhere (online sync). Saved, but not an
+   * undo step — undoing must never roll back a teammate's edit.
+   */
+  const applyRemote = useCallback((fn) => {
+    if (!latest.current) return;
+    const draft = structuredClone(latest.current);
+    fn(draft);
+    skipSave.current = false;
+    latest.current = draft;
+    setState(draft);
+  }, []);
+
   /** Swap in a whole planner (restore, import, sample data) — also undoable. */
   const replace = useCallback((next) => {
     if (latest.current) history.current = record(history.current, latest.current, Date.now(), true);
@@ -151,8 +164,8 @@ export function StoreProvider({ children }) {
   const calendar = useMemo(() => (year ? buildCalendar(year, classes) : null), [year, classes]);
 
   const value = useMemo(
-    () => ({ state, update, replace, undo, redo, notify, toast, year, classes, calendar, userId: state?.currentUserId, vault, openVault }),
-    [state, update, replace, undo, redo, notify, toast, year, classes, calendar, vault, openVault],
+    () => ({ state, update, applyRemote, replace, undo, redo, notify, toast, year, classes, calendar, userId: state?.currentUserId, vault, openVault, latest }),
+    [state, update, applyRemote, replace, undo, redo, notify, toast, year, classes, calendar, vault, openVault],
   );
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }

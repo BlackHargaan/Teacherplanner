@@ -40,6 +40,11 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+        env:
+          # Publishable key for sign-in and team lesson banks (Settings →
+          # Secrets and variables → Actions → Variables). Safe to ship in the
+          # app; leave unset to build without online sharing.
+          VITE_SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
       - name: Package
         run: npx electron-builder ${{ matrix.target }} --publish never
         env:

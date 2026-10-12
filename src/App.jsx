@@ -3,6 +3,7 @@ import { host, useStore } from './lib/store.jsx';
 import { applyAppearance } from './data/themes.js';
 import Welcome from './pages/Welcome.jsx';
 import { UpdateBanner } from './components/Updates.jsx';
+import { CloudStatus } from './components/CloudAccount.jsx';
 import { useHashRoute } from './lib/router.js';
 import { currentUser } from './lib/model.js';
 import Planner from './pages/Planner.jsx';
@@ -89,6 +90,7 @@ export default function App() {
           {PAGES.map(([p, label]) => <a key={p} href={`#/${p}`} className={p === id ? 'on' : ''}>{label}</a>)}
         </nav>
         <SearchBox initial={route === 'search' ? decodeURIComponent(param || '') : ''} />
+        <CloudStatus />
         <div className="who">
           <select value={state.currentYearId} onChange={(e) => update((d) => { d.currentYearId = e.target.value; })} aria-label="School year">
             {state.years.map((y) => <option key={y.id} value={y.id}>{y.name}</option>)}

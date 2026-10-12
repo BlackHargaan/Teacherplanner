@@ -59,6 +59,13 @@ The landing page teachers download from lives in `site/`. It's plain HTML, CSS a
 - **One-time setup:** in the repo's **Settings → Pages**, set *Source* to **GitHub Actions**.
 - **Custom domain (optional):** add it under Settings → Pages, and add a `site/CNAME` file containing the domain.
 
+### Online sharing setup (Supabase)
+The database lives in Supabase. Everything about who can see what is enforced there by row-level security; the rules are in `supabase/migrations/` and tested in `tests/rls.test.js` against a real Postgres (PGlite).
+1. **Database:** apply `supabase/migrations/20261012000000_team_lesson_banks.sql`, either through the Supabase MCP connector or by pasting it into the SQL Editor.
+2. **App key:** set the project's **publishable (anon) key**, either as the GitHub Actions variable `SUPABASE_ANON_KEY` (used by release builds) or in `src/lib/cloud/config.js`. It's designed to be public. Never use the `service_role` key in the app. Without a key, online features are hidden.
+3. **Sign-in codes:** in Supabase → Authentication → Emails, edit the **Magic Link** and **Confirm signup** templates to include the code, e.g. `<h2>Your Teacher Planner code: {{ .Token }}</h2>`. By default they send a link, which can't sign in to the desktop app.
+4. **Email delivery:** Supabase's built-in email only reaches members of your Supabase team and is heavily rate-limited. To sign in real teachers, add custom SMTP under Authentication → Emails → SMTP, using a provider such as Resend, Postmark or Amazon SES.
+
 ### Releasing
 
 Bump `version` in `package.json` (`npm version 0.4.0 --no-git-tag-version`) and commit. Then either:
@@ -96,6 +103,15 @@ Lessons are stored as an ordered sequence per class: lesson *n* is taught at the
   - The weekly plans can be arranged by day or by class, with options for lesson details, standards and supports.
   - The sub packet has notes for the day, the schedule, each class's lesson, notes for the sub, the class list with student notes, and the seating chart.
   - The desktop app saves real PDF files (Letter or A4 to match the computer's region). The browser version prints, or saves via "Save as PDF".
+
+### Online team lesson banks (sign-in and sharing)
+- **Settings → Online account:** sign in with your school email and a 6-digit code. There's no password, and the first sign-in creates the account.
+- **Collaborate → a bank → Sharing → Share this bank online:** invite teammates by email as **Can view** or **Can edit**.
+  - Teachers who already have an account are added immediately.
+  - Anyone else gets the bank automatically the first time they sign in with that email.
+- **Syncing:** changes sync on their own at sign-in, every couple of minutes, when the app is brought back to the front, and live when a teammate changes something. Edits made offline are sent when you're back online and are never overwritten by a download.
+- **Privacy:** only the shared banks go online (their sections and lessons). Rosters, grades, student notes and your **private lesson notes** stay on your computer. Files attached from your computer stay there too; links work for everyone.
+- **Leaving or losing access:** owners can change access, remove people or stop sharing; members can leave. If you lose access, your copy stays read-only, and lessons you linked into your classes are kept.
 
 ### Lesson development
 - Up to **10 sections** per class/bank, with preset layouts (Standard, 5E, Madeline Hunter, Gradual Release, Workshop, UbD, Simple). Each section has its own color, font (including any custom font name), size and bold setting, and can be shown or hidden.
@@ -151,6 +167,8 @@ Lessons are stored as an ordered sequence per class: lesson *n* is taught at the
 | `src/lib/reports.js` | Standards coverage, achievement, weighted grade averages |
 | `src/lib/ics.js` | iCalendar export and Google Calendar / Classroom links |
 | `src/pages/*` | One file per screen |
+| `src/lib/cloud/` | Online account and team-bank sync: `sync.js` (pure merge/push logic), `backend.js` (Supabase calls), `CloudProvider.jsx` (when to sync) |
+| `supabase/migrations/` | Database tables and row-level security for sign-in and sharing |
 | `electron/main.cjs` | Desktop shell: planner folder, atomic saves, daily backups, file watching, attachments, menus |
 | `electron/updater.cjs` | Update checks, background download and restart-to-update (website download on Mac) |
 | `electron/preload.cjs` | The narrow bridge (`window.plannerHost`) between the UI and the file system |

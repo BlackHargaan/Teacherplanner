@@ -21,6 +21,8 @@
     "electron-updater": "^6.3.9"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.2.12",
+    "@supabase/supabase-js": "^2.45.4",
     "@vitejs/plugin-react": "^4.3.3",
     "electron": "^33.4.11",
     "electron-builder": "^25.1.8",

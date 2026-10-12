@@ -329,7 +329,7 @@ function buildMenu() {
       role: 'help',
       submenu: [
         { label: 'Check for Updates…', click: checkFromMenu },
-        { label: 'Teacher Planner Website', click: () => shell.openExternal('https://blackhargaan.github.io/Teacherplanner/') },
+        { label: 'Teacher Planner Website', click: () => shell.openExternal('https://teachertechtools.org/teacher-planner.html') },
       ],
     },
   ]));

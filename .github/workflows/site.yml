@@ -1,6 +1,7 @@
 name: Website
 
-# Publishes the landing page in site/ to GitHub Pages whenever it changes on
+# Publishes site/ (a redirect to teachertechtools.org/teacher-planner.html,
+# kept for links in older app versions) to GitHub Pages whenever it changes on
 # the default branch. One-time setup: Settings → Pages → Source: GitHub Actions.
 on:
   push:

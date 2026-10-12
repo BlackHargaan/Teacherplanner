@@ -6,7 +6,7 @@ Teacher Planner is a **desktop app for Windows, Mac and Linux**. Like Obsidian, 
 
 ## Installing (for teachers)
 
-1. Go to **[the Teacher Planner website](https://blackhargaan.github.io/Teacherplanner/)** and click **Download**. It picks the right installer for your computer:
+1. Go to **[the Teacher Planner website](https://teachertechtools.org/teacher-planner.html)** and click **Download**. It picks the right installer for your computer:
    - **Windows:** `Teacher-Planner-…-win-x64.exe`. Double-click it. It installs in a few seconds, with no admin rights needed, and adds a desktop shortcut.
    - **Mac:** `Teacher-Planner-…-mac-universal.dmg`. Open it and drag Teacher Planner into Applications.
    - **Linux:** the `.AppImage` (make it executable, then run it) or the `.deb`.
@@ -51,13 +51,9 @@ npm run dist:linux # build installers locally (also dist:win / dist:mac, on that
 ```
 
 ### Website
-
-The landing page teachers download from lives in `site/`. It's plain HTML, CSS and JS with no build step, and is published to GitHub Pages by `.github/workflows/site.yml` whenever `site/` changes.
-- **Download buttons:** they look up the newest release when the page loads and link to the right installer for the visitor's computer, so a new release needs no site changes.
-- **Preview locally:** `python3 -m http.server --directory site`.
-- **Screenshots:** they're in `site/assets/`. Retake them when the app's look changes.
-- **One-time setup:** in the repo's **Settings → Pages**, set *Source* to **GitHub Actions**.
-- **Custom domain (optional):** add it under Settings → Pages, and add a `site/CNAME` file containing the domain.
+The download page teachers use is [teachertechtools.org/teacher-planner.html](https://teachertechtools.org/teacher-planner.html). It lives in the [TeacherTechTools](https://github.com/BlackHargaan/TeacherTechTools) repo (`teacher-planner.html`, `js/teacher-planner.js`, screenshots in `assets/teacher-planner/`).
+- **Download buttons:** they look up the newest release here when the page loads and link to the right installer for the visitor's computer, so a new release needs no site changes.
+- **Old address:** `site/` here only holds a redirect from `blackhargaan.github.io/Teacherplanner/` to the new page, so links in older app versions (Help menu, Mac update notice) still work. It's published by `.github/workflows/site.yml`.
 
 ### Online sharing setup (Supabase)
 The database lives in Supabase. Everything about who can see what is enforced there by row-level security; the rules are in `supabase/migrations/` and tested in `tests/rls.test.js` against a real Postgres (PGlite).

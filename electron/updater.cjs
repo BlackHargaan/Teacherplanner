@@ -7,7 +7,7 @@
 // there and Mac updates install automatically too.)
 const { app, BrowserWindow, shell } = require('electron');
 
-const DOWNLOAD_PAGE = 'https://blackhargaan.github.io/Teacherplanner/#download';
+const DOWNLOAD_PAGE = 'https://teachertechtools.org/teacher-planner.html#download';
 const MANUAL_DOWNLOAD = process.platform === 'darwin';
 const RECHECK_HOURS = 6;
 

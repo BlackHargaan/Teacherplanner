@@ -101,7 +101,7 @@ Lessons are stored as an ordered sequence per class: lesson *n* is taught at the
   - The desktop app saves real PDF files (Letter or A4 to match the computer's region). The browser version prints, or saves via "Save as PDF".
 
 ### Online team lesson banks (sign-in and sharing)
-- **Settings → Online account:** sign in with your school email and a 6-digit code. There's no password, and the first sign-in creates the account.
+- **Settings → Online account:** sign in with your school email and a one-time code we email you. There's no password, and the first sign-in creates the account.
 - **Collaborate → a bank → Sharing → Share this bank online:** invite teammates by email as **Can view** or **Can edit**.
   - Teachers who already have an account are added immediately.
   - Anyone else gets the bank automatically the first time they sign in with that email.

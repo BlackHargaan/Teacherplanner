@@ -20,7 +20,7 @@ const check = ({ data, error }) => {
 
 // ---- account
 
-/** Email a 6-digit sign-in code (creates the account on first use). */
+/** Email a one-time sign-in code (creates the account on first use). */
 export async function sendCode(email) {
   check(await (await supabase()).auth.signInWithOtp({ email: email.trim().toLowerCase(), options: { shouldCreateUser: true } }));
 }

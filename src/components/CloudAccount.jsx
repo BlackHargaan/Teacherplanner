@@ -11,7 +11,7 @@ const friendly = (err) => {
   return msg || 'Something went wrong. Please try again.';
 };
 
-/** Email → 6-digit code sign-in. No passwords, no browser redirects. */
+/** Email → one-time code sign-in. No passwords, no browser redirects. */
 export function SignInForm({ onSignedIn }) {
   const cloud = useCloud();
   const [email, setEmail] = useState('');
@@ -56,9 +56,9 @@ export function SignInForm({ onSignedIn }) {
     </form>
   ) : (
     <form className="signin" onSubmit={verify}>
-      <p className="small">We emailed a 6-digit code to <strong>{email}</strong>. It may take a minute — check spam if you don’t see it.</p>
+      <p className="small">We emailed a sign-in code to <strong>{email}</strong>. It may take a minute — check spam if you don’t see it.</p>
       <Field label="Sign-in code">
-        <input inputMode="numeric" autoComplete="one-time-code" autoFocus value={code} onChange={(e) => setCode(e.target.value)} placeholder="123456" maxLength={10} />
+        <input inputMode="numeric" autoComplete="one-time-code" autoFocus value={code} onChange={(e) => setCode(e.target.value)} placeholder="12345678" maxLength={10} />
       </Field>
       <div className="row wrap">
         <button className="primary" disabled={busy || code.replace(/\D/g, '').length < 6}>{busy ? 'Signing in…' : 'Sign in'}</button>

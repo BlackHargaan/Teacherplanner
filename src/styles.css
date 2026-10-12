@@ -361,3 +361,49 @@ kbd { font: inherit; font-size: 0.8em; border: 1px solid var(--border); border-b
 .std-catalog { max-height: 40vh; overflow: auto; }
 .std-catalog label { align-items: flex-start; }
 .side-list .row input { min-width: 0; }
+
+/* Year calendar (Schedule page) */
+.yearcal { --c-holiday: #64748b; --c-workday: #8b5cf6; --c-cancelled: #ef4444; --c-dayType: #f59e0b; --c-school: var(--accent); display: flex; flex-direction: column; gap: 0.6rem; }
+.yearcal-tools { display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center; }
+.brush { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; padding: 0.3rem 0.6rem; }
+.brush.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--surface)); font-weight: 600; }
+.brush-label { min-width: 12rem; }
+.swatch { width: 0.8rem; height: 0.8rem; border-radius: 3px; display: inline-block; border: 1px solid var(--border); background: color-mix(in srgb, var(--c-school) 12%, var(--surface)); }
+.brush-holiday .swatch, .sw-holiday { background: color-mix(in srgb, var(--c-holiday) 45%, var(--surface)); }
+.brush-workday .swatch, .sw-workday { background: color-mix(in srgb, var(--c-workday) 45%, var(--surface)); }
+.brush-cancelled .swatch, .sw-cancelled { background: color-mix(in srgb, var(--c-cancelled) 50%, var(--surface)); }
+.brush-dayType .swatch, .sw-dayType { background: color-mix(in srgb, var(--c-dayType) 50%, var(--surface)); }
+.brush-rotation .swatch, .brush-clearRotation .swatch { background: var(--surface); border-style: dashed; }
+.yearcal-months { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 1rem; user-select: none; touch-action: none; }
+.cal-month h3 { font-size: 0.95rem; margin: 0 0 0.3rem; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.cal-dow { font-size: 0.7rem; color: var(--muted); text-align: center; }
+.cal-day { position: relative; aspect-ratio: 1; padding: 0; min-width: 0; border-radius: 4px; border: 1px solid transparent; font-size: 0.75rem; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.05; cursor: pointer; background: transparent; color: var(--text); }
+.cal-num { font-variant-numeric: tabular-nums; }
+.cal-rot { font-size: 0.6rem; color: var(--muted); font-weight: 600; }
+.cal-school { background: color-mix(in srgb, var(--c-school) 12%, var(--surface)); }
+.cal-holiday { background: color-mix(in srgb, var(--c-holiday) 45%, var(--surface)); }
+.cal-workday { background: color-mix(in srgb, var(--c-workday) 45%, var(--surface)); }
+.cal-cancelled { background: color-mix(in srgb, var(--c-cancelled) 50%, var(--surface)); }
+.cal-dayType { background: color-mix(in srgb, var(--c-dayType) 50%, var(--surface)); }
+.cal-weekend { color: var(--muted); }
+.cal-outside { opacity: 0.35; cursor: default; }
+.cal-today { border-color: var(--text); }
+.cal-marked .cal-rot, .cal-marked-sample { text-decoration: underline; color: var(--text); }
+.cal-marked-sample { font-weight: 600; font-size: 0.75rem; }
+.cal-selecting { outline: 2px solid var(--accent); outline-offset: -1px; }
+.cal-day:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.yearcal-legend { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; list-style: none; padding: 0; margin: 0; }
+.yearcal-legend li { display: inline-flex; align-items: center; gap: 0.35rem; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.table-scroll { overflow-x: auto; max-width: 100%; }
+.bell-grid th[scope="row"] { white-space: nowrap; text-align: left; }
+.bell-grid select { min-width: 7rem; }
+.class-pick { --chip: var(--accent); border-color: color-mix(in srgb, var(--chip) 60%, var(--border)); background: color-mix(in srgb, var(--chip) 14%, var(--surface)); }
+.bells input[type="time"] { min-width: 7rem; }
+@media (max-width: 700px) {
+  .page-head .row, .subcard .row, .nsd-list li, .yearcal-tools { flex-wrap: wrap; }
+  .nsd-list li input.grow, .subcard .row input { min-width: 0; flex: 1 1 8rem; }
+  .brush-label { min-width: 0; flex: 1 1 100%; }
+  .subcard, .card:has(> .stack > .bells), .card:has(> .table) { overflow-x: auto; }
+}

@@ -6,6 +6,7 @@ import { bump, clearAt, extend, insertAt, move, placeOrInsert, pullBack, swap } 
 import { copyLesson, editSequence, pruneOrphans } from '../lib/actions.js';
 import { addDays, formatDate, formatTime, planningAnchor, startOfWeek, today, DOW_LONG } from '../lib/dates.js';
 import { dayKeyLabel, isNonSchoolDay, meetingIndexOnOrAfter, weekDates } from '../lib/schedule.js';
+import { paintDates } from '../lib/calendarPaint.js';
 import LessonEditor from '../components/LessonEditor.jsx';
 import { LessonContent, StatusChips } from '../components/LessonContent.jsx';
 import { Field, Menu, Modal, Tabs, Empty } from '../components/ui.jsx';
@@ -134,7 +135,7 @@ function DayColumn({ date, day, shownIds, detail, onOpen, onDialog }) {
         <div>
           <div className="day-name">{formatDate(date, { weekday: 'short', month: 'short', day: 'numeric' })}</div>
           <div className="small muted">
-            {day ? dayKeyLabel(day.dayKey) : outside ? 'Outside school year' : off ? off.label : 'No school'}
+            {day ? dayKeyLabel(day.dayKey, year) : outside ? 'Outside school year' : off ? off.label : 'No school'}
             {day?.dayType && <span className="badge">{day.dayType.name}</span>}
           </div>
         </div>
@@ -161,6 +162,13 @@ function DayMenu({ date, day, removed, onDialog }) {
       items={[
         { label: 'Sub plans for this day (PDF)…', onClick: () => navigate(`print/sub/${date}`) },
         { label: '+ Add extra class', onClick: () => onDialog({ kind: 'extra', date }) },
+        {
+          label: 'Cancel this day (snow day…)',
+          onClick: () => {
+            update((d) => paintDates(d.years.find((x) => x.id === year.id), [date], { kind: 'cancelled', label: 'Cancelled' }));
+            notify('Day cancelled. Its lessons moved to the next class meetings.', { undo: true });
+          },
+        },
         '-',
         ...((year.dayTypes || []).map((t) => ({ label: `${day.dayType?.id === t.id ? '✓ ' : ''}Make “${t.name}”`, onClick: () => setDayType(t.id) }))),
         day.dayType && { label: 'Restore regular schedule', onClick: () => setDayType(null) },

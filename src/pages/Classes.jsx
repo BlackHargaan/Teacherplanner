@@ -98,6 +98,7 @@ export default function Classes() {
 
 function SlotsEditor({ cls, edit, year }) {
   const keys = dayKeysFor(year);
+  const periods = year.periods || [];
   const [bulkStart, setBulkStart] = useState('08:00');
   const [bulkEnd, setBulkEnd] = useState('08:50');
   const slotFor = (k) => cls.slots.find((s) => s.dayKey === k);
@@ -117,16 +118,30 @@ function SlotsEditor({ cls, edit, year }) {
         <button onClick={() => edit((c) => { c.slots = keys.map((k) => ({ dayKey: k, start: bulkStart, end: bulkEnd })); })}>Meets every day at this time</button>
       </div>
       <table className="table compact">
-        <thead><tr><th>Day</th><th>Meets</th><th>Start</th><th>End</th></tr></thead>
+        <thead><tr><th>Day</th><th>Meets</th>{periods.length > 0 && <th>Period</th>}<th>Start</th><th>End</th></tr></thead>
         <tbody>
           {keys.map((k) => {
             const s = slotFor(k);
+            const label = dayKeyLabel(k, year);
             return (
               <tr key={k}>
-                <td>{dayKeyLabel(k)}</td>
-                <td><input type="checkbox" checked={!!s} onChange={(e) => setSlot(k, e.target.checked ? {} : null)} /></td>
-                <td>{s && <input type="time" value={s.start} onChange={(e) => setSlot(k, { start: e.target.value })} />}</td>
-                <td>{s && <input type="time" value={s.end} onChange={(e) => setSlot(k, { end: e.target.value })} />}</td>
+                <td>{label}</td>
+                <td><input type="checkbox" aria-label={`Meets on ${label}`} checked={!!s} onChange={(e) => setSlot(k, e.target.checked ? {} : null)} /></td>
+                {periods.length > 0 && (
+                  <td>
+                    <select aria-label={`Period on ${label}`} value={s?.periodId || ''} onChange={(e) => {
+                      const p = periods.find((x) => x.id === e.target.value);
+                      if (p) setSlot(k, { periodId: p.id, start: p.start, end: p.end });
+                      else if (s) setSlot(k, { periodId: undefined });
+                    }}>
+                      <option value="">{s ? 'Custom time' : '—'}</option>
+                      {periods.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                  </td>
+                )}
+                {/* Typing a time by hand unlinks the slot from its period. */}
+                <td>{s && <input type="time" aria-label={`Starts on ${label}`} value={s.start} onChange={(e) => setSlot(k, { start: e.target.value, periodId: undefined })} />}</td>
+                <td>{s && <input type="time" aria-label={`Ends on ${label}`} value={s.end} onChange={(e) => setSlot(k, { end: e.target.value, periodId: undefined })} />}</td>
               </tr>
             );
           })}

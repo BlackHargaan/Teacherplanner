@@ -33,6 +33,10 @@ export function makeYear(fields = {}) {
     cycleLength: 6,
     cycleStartDay: 1,
     nonSchoolDays: [],
+    cancelledDayRotation: 'keep',
+    rotationOverrides: {},
+    periods: [],
+    gradingPeriods: [],
     dayTypes: [],
     dayAssignments: {},
     overrides: [],
@@ -252,7 +256,10 @@ export function rolloverYear(state, yearId, { name, start, end, copyLessons = tr
     name,
     start,
     end,
-    nonSchoolDays: (src.nonSchoolDays || []).map((r) => ({ ...r, start: shift(r.start), end: r.end ? shift(r.end) : undefined })),
+    // Cancelled days and district rotation marks belong to one year only.
+    nonSchoolDays: (src.nonSchoolDays || []).filter((r) => r.kind !== 'cancelled').map((r) => ({ ...r, start: shift(r.start), end: r.end ? shift(r.end) : undefined })),
+    gradingPeriods: (src.gradingPeriods || []).map((g) => ({ ...g, id: uid('term'), start: shift(g.start), end: shift(g.end) })),
+    rotationOverrides: {},
     dayAssignments: {},
     overrides: [],
   };

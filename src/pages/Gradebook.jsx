@@ -12,15 +12,19 @@ export default function Gradebook() {
   const [classId, setClassId] = useState(visible[0]?.id);
   const [report, setReport] = useState(null);
   const [adding, setAdding] = useState(false);
+  const [termId, setTermId] = useState('');
   const cls = visible.find((c) => c.id === classId);
   if (!cls) return <div className="page"><Empty>Create a class to use the gradebook.</Empty></div>;
-  const gb = cls.gradebook;
+  const terms = year.gradingPeriods || [];
+  const term = terms.find((t) => t.id === termId);
+  // Averages, the table and the CSV cover the chosen grading period only.
+  const gb = term ? { ...cls.gradebook, assignments: cls.gradebook.assignments.filter((a) => a.date >= term.start && a.date <= term.end) } : cls.gradebook;
   const editable = canEdit(cls, userId);
   const edit = (fn) => update((d) => fn(d.classes.find((c) => c.id === cls.id).gradebook));
   const assignments = [...gb.assignments].sort((a, b) => a.date.localeCompare(b.date));
   const students = [...cls.students].sort((a, b) => `${a.last}${a.first}`.localeCompare(`${b.last}${b.first}`));
 
-  const exportCsv = () => download(`${cls.name}-grades.csv`, toCSV([
+  const exportCsv = () => download(`${cls.name}${term ? ` ${term.name}` : ''}-grades.csv`, toCSV([
     ['Last', 'First', ...assignments.map((a) => `${a.name} (${a.points})`), 'Average', 'Grade'],
     ...students.map((s) => {
       const avg = studentAverage(gb, s.id);
@@ -34,6 +38,12 @@ export default function Gradebook() {
         <h1>Gradebook</h1>
         <div className="row wrap">
           <select value={classId} onChange={(e) => setClassId(e.target.value)}>{visible.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+          {terms.length > 0 && (
+            <select aria-label="Grading period" value={termId} onChange={(e) => setTermId(e.target.value)}>
+              <option value="">Whole year</option>
+              {terms.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          )}
           {editable && <button className="primary" onClick={() => setAdding(true)}>+ Assignment</button>}
           <button onClick={exportCsv}>Export CSV</button>
         </div>
@@ -113,7 +123,7 @@ export default function Gradebook() {
         </div>
       )}
       {adding && <AssignmentDialog cls={cls} onClose={() => setAdding(false)} />}
-      {report && <StudentReport cls={cls} student={report} yearStart={year.start} onClose={() => setReport(null)} />}
+      {report && <StudentReport cls={cls} gb={gb} term={term} student={report} yearStart={year.start} onClose={() => setReport(null)} />}
     </div>
   );
 }
@@ -139,15 +149,14 @@ function AssignmentDialog({ cls, onClose }) {
   );
 }
 
-function StudentReport({ cls, student, yearStart, onClose }) {
+function StudentReport({ cls, gb, term, student, yearStart, onClose }) {
   const { state } = useStore();
-  const gb = cls.gradebook;
   const std = standardIndex(state);
   const avg = studentAverage(gb, student.id);
   const scored = [...new Set(cls.standardScores.filter((s) => s.studentId === student.id).map((s) => s.standardId))];
   const label = (v) => [...state.scale].sort((a, b) => b.value - a.value).find((s) => v >= s.value);
   return (
-    <Modal title={`${student.first} ${student.last} — ${cls.name}`} onClose={onClose} wide footer={<><span className="grow" /><button onClick={() => window.print()}>Print</button></>}>
+    <Modal title={`${student.first} ${student.last} — ${cls.name}${term ? ` — ${term.name}` : ''}`} onClose={onClose} wide footer={<><span className="grow" /><button onClick={() => window.print()}>Print</button></>}>
       <p><strong>Average:</strong> {avg == null ? '—' : `${avg.toFixed(1)}% (${letterGrade(avg)})`}</p>
       {student.notes && <p className="small"><strong>Notes:</strong> {student.notes}</p>}
       <table className="table compact">

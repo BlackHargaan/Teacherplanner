@@ -153,6 +153,17 @@ export function lessonHome(state, lesson) {
   return lesson ? findContainer(state, lesson.homeType, lesson.homeId) : null;
 }
 
+/**
+ * Copy the planner for an edit. Standards downloaded from the state catalog
+ * are read-only, so every copy (and every undo step) shares one list of them.
+ */
+export function cloneState(state) {
+  const { frameworks = [], ...rest } = state;
+  const copy = structuredClone(rest);
+  copy.frameworks = frameworks.map((f) => (f.source?.catalog ? { ...f } : structuredClone(f)));
+  return copy;
+}
+
 export function allFrameworks(state) {
   return [...BUILTIN_FRAMEWORKS, ...(state.frameworks || [])];
 }

@@ -53,6 +53,7 @@ npm run dist:linux # build installers locally (also dist:win / dist:mac, on that
 ### Website
 The download page teachers use is [teachertechtools.org/teacher-planner.html](https://teachertechtools.org/teacher-planner.html). It lives in the [TeacherTechTools](https://github.com/BlackHargaan/TeacherTechTools) repo (`teacher-planner.html`, `js/teacher-planner.js`, screenshots in `assets/teacher-planner/`).
 - **Download buttons:** they look up the newest release here when the page loads and link to the right installer for the visitor's computer, so a new release needs no site changes.
+- **State standards catalog:** `.github/workflows/site.yml` also builds `site/standards/` (an `index.json` plus one file per standards document) from the [Learning Commons Knowledge Graph](https://docs.learningcommons.org/knowledge-graph/datasets/us-academic-standards) export with `scripts/build-standards.mjs`, and publishes it to GitHub Pages. It covers math, ELA, science and social studies for all 50 states and D.C. (CC BY 4.0, credited per state in the app). It rebuilds monthly; run the *Website* workflow to refresh it sooner. The built files aren't committed.
 - **Old address:** `site/` here only holds a redirect from `blackhargaan.github.io/Teacherplanner/` to the new page, so links in older app versions (Help menu, Mac update notice) still work. It's published by `.github/workflows/site.yml`.
 
 ### Online sharing setup (Supabase)

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { useStore } from '../lib/store.jsx';
 import { allFrameworks, canEdit, canView, uid, yearClasses } from '../lib/model.js';
 import { parseCSV, toCSV } from '../lib/csv.js';
@@ -6,6 +6,10 @@ import { achievement, standardsCoverage } from '../lib/reports.js';
 import { formatDate, today } from '../lib/dates.js';
 import { ACCOMMODATIONS, DIFFERENTIATION, STRATEGIES } from '../data/presets.js';
 import { Chip, Empty, Field, Tabs, download } from '../components/ui.jsx';
+import StateStandardsPicker from '../components/StateStandardsPicker.jsx';
+import { VERSION_DATE, fetchCatalog, fetchFramework, updatedFramework, updatesAvailable, usedStandardIds } from '../lib/standardsCatalog.js';
+
+const LIST_LIMIT = 400;
 
 export default function Standards() {
   const [tab, setTab] = useState('browse');
@@ -29,9 +33,44 @@ function Browse() {
   const [q, setQ] = useState('');
   const [grade, setGrade] = useState('');
   const fw = frameworks.find((f) => f.id === fwId);
-  const custom = state.frameworks.some((f) => f.id === fwId);
-  const grades = fw ? [...new Set(fw.standards.map((s) => s.grade))] : [];
-  const list = (fw?.standards || []).filter((s) => (!grade || s.grade === grade) && (!q || `${s.code} ${s.description}`.toLowerCase().includes(q.toLowerCase())));
+  const fromCatalog = Boolean(fw?.source?.catalog);
+  // Official state standards are read-only; teachers can remove or update the set.
+  const removable = state.frameworks.some((f) => f.id === fwId);
+  const custom = removable && !fromCatalog;
+  const gradesOf = (s) => (s.grades?.length ? s.grades : s.grade ? [s.grade] : []);
+  const grades = fw ? [...new Set(fw.standards.flatMap(gradesOf))] : [];
+  const list = (fw?.standards || []).filter((s) => (!grade || gradesOf(s).includes(grade)) && (!q || `${s.code} ${s.description} ${s.group || ''}`.toLowerCase().includes(q.toLowerCase())));
+  const shown = list.slice(0, LIST_LIMIT);
+  const [adding, setAdding] = useState(false);
+  const [checking, setChecking] = useState(false);
+
+  const checkForUpdate = async () => {
+    setChecking(true);
+    try {
+      const catalog = await fetchCatalog();
+      if (!updatesAvailable([fw], catalog).length) { notify('These standards are up to date.'); return; }
+      const data = await fetchFramework(fw.source.id);
+      const used = usedStandardIds(state);
+      update((d) => {
+        const i = d.frameworks.findIndex((f) => f.id === fw.id);
+        if (i >= 0) d.frameworks[i] = updatedFramework(d.frameworks[i], data, used);
+      });
+      notify(`Updated ${fw.name}`);
+    } catch (err) {
+      notify(err.message, true);
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const removeFramework = () => {
+    const used = usedStandardIds(state);
+    const tagged = fw.standards.filter((s) => used.has(s.id)).length;
+    const msg = tagged
+      ? `Remove “${fw.name}”? ${tagged} of its standards are tagged in lessons, assignments or scores. The tags stay, but they’ll show as codes only until you add these standards again.`
+      : `Remove “${fw.name}”?`;
+    if (window.confirm(msg)) update((d) => { d.frameworks = d.frameworks.filter((f) => f.id !== fw.id); });
+  };
   const [form, setForm] = useState({ code: '', description: '', grade: '' });
   const [newFw, setNewFw] = useState('');
 
@@ -65,6 +104,8 @@ function Browse() {
   return (
     <div className="split inner">
       <aside className="side-list">
+        <button className="primary" onClick={() => setAdding(true)}>+ Add state standards</button>
+        {adding && <StateStandardsPicker onClose={() => setAdding(false)} onAdded={(id) => { if (id) { setFwId(id); setGrade(''); setQ(''); } }} />}
         {frameworks.map((f) => (
           <button key={f.id} className={`side-item ${f.id === fwId ? 'on' : ''}`} onClick={() => { setFwId(f.id); setGrade(''); }}>
             <span className="grow">{f.name}<br /><span className="small muted">{f.region} · {f.subject} · {f.standards.length}</span></span>
@@ -91,20 +132,33 @@ function Browse() {
               <input placeholder="Search standards…" value={q} onChange={(e) => setQ(e.target.value)} className="grow" />
               <select value={grade} onChange={(e) => setGrade(e.target.value)}>
                 <option value="">All grades</option>
-                {grades.map((g) => <option key={g} value={g}>Grade {g}</option>)}
+                {grades.map((g) => <option key={g} value={g}>{g === 'PK' ? 'Pre-K' : g === 'K' ? 'Kindergarten' : `Grade ${g}`}</option>)}
               </select>
-              {custom && <button className="danger" onClick={() => { if (window.confirm('Delete this framework?')) update((d) => { d.frameworks = d.frameworks.filter((f) => f.id !== fw.id); }); }}>Delete framework</button>}
+              {fromCatalog && <button disabled={checking} onClick={checkForUpdate}>{checking ? 'Checking…' : 'Check for updates'}</button>}
+              {removable && <button className="danger" onClick={removeFramework}>{fromCatalog ? 'Remove' : 'Delete framework'}</button>}
             </div>
+            {fromCatalog && (
+              <p className="small muted">
+                {fw.region} · {fw.subject}{fw.grades ? ` · grades ${fw.grades.join(', ')} only` : ''}{fw.source.updated ? ` · state version of ${formatDate(fw.source.updated, VERSION_DATE)}` : ''}
+                <br />{fw.attribution}
+              </p>
+            )}
+            {list.length > LIST_LIMIT && <p className="small muted" role="status">Showing {LIST_LIMIT} of {list.length.toLocaleString()} standards. Search or pick a grade to narrow the list.</p>}
             <table className="table">
               <thead><tr><th>Code</th><th>Grade</th><th>Description</th>{custom && <th />}</tr></thead>
               <tbody>
-                {list.map((s) => (
-                  <tr key={s.id}>
-                    <td className="nowrap"><strong>{s.code}</strong></td>
-                    <td>{s.grade}</td>
-                    <td>{s.description}</td>
-                    {custom && <td><button className="icon-btn" onClick={() => update((d) => { const f = d.frameworks.find((x) => x.id === fw.id); f.standards = f.standards.filter((x) => x.id !== s.id); })}>✕</button></td>}
-                  </tr>
+                {shown.map((s, i) => (
+                  <Fragment key={s.id}>
+                    {s.group && s.group !== shown[i - 1]?.group && (
+                      <tr className="std-group"><th colSpan={custom ? 4 : 3} scope="colgroup">{s.group}</th></tr>
+                    )}
+                    <tr>
+                      <td className="nowrap"><strong>{s.code}</strong>{s.retired && <span className="badge" title="No longer in the state’s current standards">Retired</span>}</td>
+                      <td className="nowrap">{s.grade}</td>
+                      <td className="pre-line">{s.description}</td>
+                      {custom && <td><button className="icon-btn" onClick={() => update((d) => { const f = d.frameworks.find((x) => x.id === fw.id); f.standards = f.standards.filter((x) => x.id !== s.id); })}>✕</button></td>}
+                    </tr>
+                  </Fragment>
                 ))}
               </tbody>
             </table>

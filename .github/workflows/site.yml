@@ -1,11 +1,17 @@
 name: Website
 
-# Publishes site/ (a redirect to teachertechtools.org/teacher-planner.html,
-# kept for links in older app versions) to GitHub Pages whenever it changes on
-# the default branch. One-time setup: Settings → Pages → Source: GitHub Actions.
+# Publishes site/ to GitHub Pages from the default branch:
+#   - index.html: a redirect to teachertechtools.org/teacher-planner.html, kept
+#     for links in older app versions
+#   - standards/: the state standards catalog the app downloads, built from the
+#     Learning Commons Knowledge Graph (CC BY 4.0) by scripts/build-standards.mjs
+# Runs when either changes, monthly to pick up standards updates, or by hand.
+# One-time setup: Settings → Pages → Source: GitHub Actions.
 on:
   push:
-    paths: ['site/**', '.github/workflows/site.yml']
+    paths: ['site/**', 'scripts/build-standards.mjs', '.github/workflows/site.yml']
+  schedule:
+    - cron: '17 7 3 * *'
   workflow_dispatch:
 
 permissions:
@@ -26,6 +32,30 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Find the latest Knowledge Graph release
+        id: kg
+        shell: bash
+        run: |
+          v=$(curl -fsSL https://docs.learningcommons.org/knowledge-graph/using-knowledge-graph/local-files.md \
+            | grep -oE 'knowledge-graph/v[0-9]+\.[0-9]+\.[0-9]+/exports' | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || true)
+          echo "version=${v:-1.14.0}" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        id: cache
+        with:
+          path: kg
+          key: knowledge-graph-${{ steps.kg.outputs.version }}
+      - name: Download the Knowledge Graph export
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p kg
+          for f in nodes relationships; do
+            curl -fsSL "https://cdn.learningcommons.org/knowledge-graph/v${{ steps.kg.outputs.version }}/exports/$f.jsonl" -o "kg/$f.jsonl"
+          done
+      - name: Build the standards catalog
+        run: node --max-old-space-size=4096 scripts/build-standards.mjs --nodes kg/nodes.jsonl --rels kg/relationships.jsonl --out site/standards --version ${{ steps.kg.outputs.version }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

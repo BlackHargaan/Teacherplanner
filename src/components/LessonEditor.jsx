@@ -86,7 +86,7 @@ export default function LessonEditor({ containerId, index, date, meeting, onClos
   const uses = existing ? [...state.classes, ...state.banks].reduce((n, c) => n + c.sequence.filter((x) => x === lessonId).length, 0) : 0;
 
   const stdIndex = useMemo(() => standardIndex(state), [state]);
-  const stdOptions = useMemo(() => Object.values(stdIndex).map((s) => ({ value: s.id, label: s.code, sub: `${s.subject} · ${s.description}` })), [stdIndex]);
+  const stdOptions = useMemo(() => Object.values(stdIndex).map((s) => ({ value: s.id, label: s.code, sub: `${s.retired ? 'Retired · ' : ''}${s.subject} · ${s.description}` })), [stdIndex]);
   const templates = state.templates;
   const activeTemplateIds = effectiveTemplateIds(container, draft);
   const activeTemplates = templates.filter((t) => activeTemplateIds.includes(t.id));

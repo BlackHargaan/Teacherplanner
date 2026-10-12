@@ -352,3 +352,12 @@ kbd { font: inherit; font-size: 0.8em; border: 1px solid var(--border); border-b
 .error-text { color: var(--danger); }
 .attachment-missing { opacity: 0.75; cursor: help; }
 .badge { white-space: nowrap; }
+
+/* State standards */
+.pre-line { white-space: pre-line; }
+.std-group th { text-align: left; font-size: 0.8rem; font-weight: 600; color: var(--muted); background: var(--surface-2); padding-top: 0.6rem; }
+.plain-fieldset { border: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.4rem; min-width: 0; }
+.stack { display: flex; flex-direction: column; gap: 0.9rem; }
+.std-catalog { max-height: 40vh; overflow: auto; }
+.std-catalog label { align-items: flex-start; }
+.side-list .row input { min-width: 0; }

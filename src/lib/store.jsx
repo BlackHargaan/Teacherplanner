@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { demoState, emptyState, currentYear, yearClasses } from './model.js';
+import { cloneState, demoState, emptyState, currentYear, yearClasses } from './model.js';
 import { buildCalendar } from './schedule.js';
 import { createHistory, record, undo as undoStep, redo as redoStep } from './history.js';
 
@@ -110,7 +110,7 @@ export function StoreProvider({ children }) {
   /** Apply a mutation to a deep copy of state (undoable). */
   const update = useCallback((fn) => {
     const prev = latest.current;
-    const draft = structuredClone(prev);
+    const draft = cloneState(prev);
     fn(draft);
     history.current = record(history.current, prev);
     latest.current = draft;
@@ -123,7 +123,7 @@ export function StoreProvider({ children }) {
    */
   const applyRemote = useCallback((fn) => {
     if (!latest.current) return;
-    const draft = structuredClone(latest.current);
+    const draft = cloneState(latest.current);
     fn(draft);
     skipSave.current = false;
     latest.current = draft;

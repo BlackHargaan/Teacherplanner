@@ -61,8 +61,8 @@ The landing page teachers download from lives in `site/`. It's plain HTML, CSS a
 
 ### Online sharing setup (Supabase)
 The database lives in Supabase. Everything about who can see what is enforced there by row-level security; the rules are in `supabase/migrations/` and tested in `tests/rls.test.js` against a real Postgres (PGlite).
-1. **Database:** apply `supabase/migrations/20261012000000_team_lesson_banks.sql`, either through the Supabase MCP connector or by pasting it into the SQL Editor.
-2. **App key:** set the project's **publishable (anon) key**, either as the GitHub Actions variable `SUPABASE_ANON_KEY` (used by release builds) or in `src/lib/cloud/config.js`. It's designed to be public. Never use the `service_role` key in the app. Without a key, online features are hidden.
+1. **Database:** the migrations in `supabase/migrations/` are applied to the project (`dldsaiujhowpgryxdnxj`) in filename order. The last one, `*_drop_public_helpers.sql`, is an optional tidy-up to paste into the SQL Editor. Supabase's security advisor is clean apart from the two functions teachers are meant to call (`invite_to_bank`, `accept_invites`).
+2. **App key:** the project's **publishable key** is in `src/lib/cloud/config.js`. It's designed to be public, and the GitHub Actions variable `SUPABASE_ANON_KEY` can override it. Never put the secret (`service_role`) key in the app.
 3. **Sign-in codes:** in Supabase → Authentication → Emails, edit the **Magic Link** and **Confirm signup** templates to include the code, e.g. `<h2>Your Teacher Planner code: {{ .Token }}</h2>`. By default they send a link, which can't sign in to the desktop app.
 4. **Email delivery:** Supabase's built-in email only reaches members of your Supabase team and is heavily rate-limited. To sign in real teachers, add custom SMTP under Authentication → Emails → SMTP, using a provider such as Resend, Postmark or Amazon SES.
 

@@ -1,10 +1,12 @@
 // Runs the real migration in an embedded Postgres (PGlite) with a stand-in
 // for Supabase's auth schema, then checks what each teacher can and can't do.
 import { describe, it, expect, beforeAll } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { PGlite } from '@electric-sql/pglite';
 
-const MIGRATION = readFileSync(new URL('../supabase/migrations/20261012000000_team_lesson_banks.sql', import.meta.url), 'utf8');
+// Every migration, in order — the same files applied to the live project.
+const DIR = new URL('../supabase/migrations/', import.meta.url);
+const MIGRATIONS = readdirSync(DIR).filter((f) => f.endsWith('.sql')).sort().map((f) => readFileSync(new URL(f, DIR), 'utf8'));
 const SUPABASE_STUB = `
   create role anon nologin; create role authenticated nologin;
   create schema auth;
@@ -51,7 +53,7 @@ const fails = async (p) => { try { await p; return false; } catch { return true;
 beforeAll(async () => {
   db = new PGlite();
   await db.exec(SUPABASE_STUB);
-  await db.exec(MIGRATION);
+  for (const sql of MIGRATIONS) await db.exec(sql);
   await db.exec(GRANTS);
   for (const id of [ANA, BEN, DAN]) await signUp(id);
   await as(ANA, "insert into banks (id, name) values ('bank-1', 'Grade 7 Science')");
@@ -127,6 +129,14 @@ describe('team lesson banks — row-level security', () => {
     expect((await as(CLEO, 'select name from banks')).map((r) => r.name)).toEqual(['Grade 7 Science Team']);
     expect(await as(CLEO, 'select * from bank_invites')).toEqual([]);
     expect((await as(CLEO, 'select accept_invites() as n'))[0].n).toBe(0);
+  });
+
+  it('does not expose the access-check helpers or trigger functions as API calls', async () => {
+    const callable = await as(BEN, `select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname = 'public' and has_function_privilege(p.oid, 'execute') order by 1`);
+    expect(callable.map((r) => r.proname)).toEqual(['accept_invites', 'invite_to_bank']);
+    expect((await as(null, `select count(*)::int as n from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where n.nspname in ('public', 'private') and has_function_privilege(p.oid, 'execute')`))[0].n).toBe(0);
   });
 
   it('lets a member leave, and the owner remove members', async () => {

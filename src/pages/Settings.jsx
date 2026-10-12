@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { UpdatesCard } from '../components/Updates.jsx';
+import { useHashRoute } from '../lib/router.js';
 import { host, useStore, resetToDemo, resetToEmpty } from '../lib/store.jsx';
 import { uid } from '../lib/model.js';
 import { download } from '../components/ui.jsx';
@@ -10,6 +12,10 @@ export default function Settings() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const me = state.users.find((u) => u.id === userId);
+  const [, section] = useHashRoute();
+  useEffect(() => {
+    if (section) document.getElementById(section)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [section]);
   const setAppearance = (patch) => update((d) => {
     const u = d.users.find((x) => x.id === userId);
     u.appearance = { ...(u.appearance || {}), ...patch };
@@ -97,6 +103,8 @@ export default function Settings() {
           </div>
         </section>
 
+        <UpdatesCard />
+
         <section className="card">
           <h2>Lesson status tags</h2>
           {state.statuses.map((s, i) => (
@@ -133,7 +141,6 @@ export default function Settings() {
                   notify(info.hasData ? 'Opened planner folder' : 'Planner moved to the new folder');
                 }}>Move / switch folder…</button>
               </div>
-              <p className="small muted">Version {vault.version}</p>
             </>
           ) : (
             <p className="small muted">Everything is stored in this browser. Export a backup regularly, or to move to another computer.</p>

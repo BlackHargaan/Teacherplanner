@@ -15,11 +15,13 @@ Teacher Planner is a **desktop app for Windows, Mac and Linux**. Like Obsidian, 
    - **Choose another folder…** lets you pick a folder in **OneDrive, Google Drive or Dropbox** to use the same planner at home and at school. Install the app on both computers and choose the same folder.
 3. Start with the sample classes to explore, or start empty.
 
-The app checks GitHub Releases for new versions and updates itself.
+The app checks for new versions at launch and every few hours, and teachers can check any time under **Settings → Updates** or **Help → Check for Updates…**.
+- **Windows and Linux:** the update downloads in the background and installs on restart. A banner offers **Restart to update**.
+- **Mac:** the app says a new version is available and opens the website to download it. macOS won't install updates for an app that isn't code-signed, so automatic Mac updates start once the Mac build is signed. Then set `MANUAL_DOWNLOAD` to `false` in `electron/updater.cjs`.
 
 > **First-run security prompts.** The installers aren't code-signed yet, so the computer warns the first time:
 > - **Windows** shows "Windows protected your PC". Click **More info → Run anyway**.
-> - **Mac** says the app "can't be opened". **Right-click the app → Open → Open**, once.
+> - **Mac** says the app can't be opened. Go to **System Settings → Privacy & Security**, scroll down and click **Open Anyway**. This is needed once.
 >
 > Both go away once the builds are signed (see *Releasing*).
 
@@ -64,7 +66,7 @@ Bump `version` in `package.json` (`npm version 0.4.0 --no-git-tag-version`) and 
 - go to **Actions → Desktop installers → Run workflow** and tick **publish**, which tags the commit `v<version>` and publishes the release, or
 - push a tag yourself: `git tag v0.4.0 && git push origin v0.4.0`.
 
-The **Desktop installers** GitHub Action (`.github/workflows/release.yml`) builds the Windows, Mac and Linux installers and publishes them, with auto-update metadata, on the Releases page. Installed copies update themselves to the newest release. Running the workflow without **publish** only builds the installers as downloadable artifacts.
+The **Desktop installers** GitHub Action (`.github/workflows/release.yml`) builds the Windows, Mac and Linux installers and publishes them, with auto-update metadata, on the Releases page. Installed copies find the new release on their own (see *Installing* for how Mac differs). Running the workflow without **publish** only builds the installers as downloadable artifacts.
 
 To remove the security prompts, add code signing:
 - **Mac:** an Apple Developer account (US$99/yr). Set the `CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD` and `APPLE_TEAM_ID` secrets for notarization.
@@ -139,5 +141,6 @@ Lessons are stored as an ordered sequence per class: lesson *n* is taught at the
 | `src/lib/reports.js` | Standards coverage, achievement, weighted grade averages |
 | `src/lib/ics.js` | iCalendar export and Google Calendar / Classroom links |
 | `src/pages/*` | One file per screen |
-| `electron/main.cjs` | Desktop shell: planner folder, atomic saves, daily backups, file watching, attachments, auto-update |
+| `electron/main.cjs` | Desktop shell: planner folder, atomic saves, daily backups, file watching, attachments, menus |
+| `electron/updater.cjs` | Update checks, background download and restart-to-update (website download on Mac) |
 | `electron/preload.cjs` | The narrow bridge (`window.plannerHost`) between the UI and the file system |

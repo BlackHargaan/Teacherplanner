@@ -9,6 +9,7 @@ const { app, BrowserWindow, dialog, ipcMain, protocol, net, shell, Menu } = requ
 const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
+const updates = require('./updater.cjs');
 
 const DATA_FILE = 'planner.json';
 const BACKUP_DAYS = 30;
@@ -170,6 +171,11 @@ ipcMain.handle('vault:save-attachment', (_e, { name, data }) => {
 
 ipcMain.handle('vault:open-path', (_e, rel) => shell.openPath(rel ? insideVault(rel) : vaultPath));
 
+ipcMain.handle('update:status', () => updates.getStatus());
+ipcMain.handle('update:check', () => updates.check());
+ipcMain.handle('update:install', () => updates.install());
+ipcMain.handle('update:download-page', () => updates.openDownloadPage());
+
 // ---------------------------------------------------------------- window
 
 function isInternal(url) {
@@ -218,6 +224,16 @@ function createWindow(hash = '') {
   return win;
 }
 
+// Show Settings → Updates and run a check there, so the result is visible.
+function checkFromMenu() {
+  const win = mainWindow && !mainWindow.isDestroyed() ? mainWindow : BrowserWindow.getAllWindows()[0];
+  if (win) {
+    win.show();
+    win.webContents.send('app:navigate', 'settings/updates');
+  }
+  updates.check();
+}
+
 function buildMenu() {
   const isMac = process.platform === 'darwin';
   Menu.setApplicationMenu(Menu.buildFromTemplate([
@@ -234,6 +250,13 @@ function buildMenu() {
     { role: 'editMenu' },
     { role: 'viewMenu' },
     { role: 'windowMenu' },
+    {
+      role: 'help',
+      submenu: [
+        { label: 'Check for Updates…', click: checkFromMenu },
+        { label: 'Teacher Planner Website', click: () => shell.openExternal('https://blackhargaan.github.io/Teacherplanner/') },
+      ],
+    },
   ]));
 }
 
@@ -256,12 +279,7 @@ app.whenReady().then(() => {
   buildMenu();
   mainWindow = createWindow();
 
-  if (app.isPackaged) {
-    try {
-      // Installs updates published on GitHub Releases the next time the app restarts.
-      require('electron-updater').autoUpdater.checkForUpdatesAndNotify().catch(() => {});
-    } catch { /* updates are optional */ }
-  }
+  updates.startBackgroundChecks();
 });
 
 app.on('second-instance', () => {

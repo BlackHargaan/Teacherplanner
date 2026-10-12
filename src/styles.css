@@ -266,3 +266,7 @@ button.big .small, .btn.big .small { font-weight: 400; opacity: 0.85; }
 .segmented { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
 .segmented button { border: none; border-radius: 0; background: var(--surface); }
 .segmented button.on { background: var(--accent); color: var(--accent-text); }
+
+/* update banner */
+.update-banner { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; padding: 0.5rem 1rem; background: color-mix(in srgb, var(--accent) 12%, var(--surface)); border-bottom: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border)); font-size: 0.9rem; }
+.update-status { display: flex; flex-direction: column; gap: 0.5rem; }

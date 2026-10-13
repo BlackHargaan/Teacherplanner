@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../lib/store.jsx';
-import { canEdit, canView, standardIndex, uid } from '../lib/model.js';
+import { canEdit, canView, standardIndex, standardOptions, uid } from '../lib/model.js';
 import { achievement, letterGrade, studentAverage } from '../lib/reports.js';
 import { toCSV } from '../lib/csv.js';
 import { formatDate, today } from '../lib/dates.js';
@@ -131,7 +131,8 @@ export default function Gradebook() {
 function AssignmentDialog({ cls, onClose }) {
   const { state, update } = useStore();
   const [a, setA] = useState({ name: '', categoryId: cls.gradebook.categories[0].id, date: today(), points: 10, standardIds: [] });
-  const stdOptions = useMemo(() => Object.values(standardIndex(state)).map((s) => ({ value: s.id, label: s.code, sub: s.description })), [state]);
+  const stdIndex = useMemo(() => standardIndex(state), [state]);
+  const stdOptions = useMemo(() => standardOptions(stdIndex, a.standardIds), [stdIndex, a.standardIds]);
   const save = () => {
     update((d) => d.classes.find((c) => c.id === cls.id).gradebook.assignments.push({ id: uid('asg'), ...a, points: Number(a.points) }));
     onClose();

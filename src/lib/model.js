@@ -168,16 +168,34 @@ export function cloneState(state) {
   return copy;
 }
 
-export function allFrameworks(state) {
-  return [...BUILTIN_FRAMEWORKS, ...(state.frameworks || [])];
+/**
+ * Frameworks shown in the app. Teachers can remove the built-in samples; a
+ * removed one is only hidden (state.hiddenFrameworks), so lessons tagged with
+ * its standards keep their labels and it can be brought back.
+ */
+export function allFrameworks(state, { includeHidden = false } = {}) {
+  const hidden = new Set(includeHidden ? [] : state.hiddenFrameworks || []);
+  return [...BUILTIN_FRAMEWORKS, ...(state.frameworks || [])].filter((f) => !hidden.has(f.id));
 }
 
+export const isBuiltinFramework = (id) => BUILTIN_FRAMEWORKS.some((f) => f.id === id);
+
+/** Every standard by id, including hidden frameworks (so existing tags keep their labels). */
 export function standardIndex(state) {
   const map = {};
-  for (const fw of allFrameworks(state)) {
-    for (const st of fw.standards) map[st.id] = { ...st, frameworkId: fw.id, frameworkName: fw.name, subject: fw.subject };
+  const hidden = new Set(state.hiddenFrameworks || []);
+  for (const fw of allFrameworks(state, { includeHidden: true })) {
+    for (const st of fw.standards) map[st.id] = { ...st, frameworkId: fw.id, frameworkName: fw.name, subject: fw.subject, hidden: hidden.has(fw.id) };
   }
   return map;
+}
+
+/** Options for standards pickers: no removed frameworks or retired standards, unless already chosen. */
+export function standardOptions(index, selected = []) {
+  const keep = new Set(selected);
+  return Object.values(index)
+    .filter((s) => keep.has(s.id) || (!s.hidden && !s.retired))
+    .map((s) => ({ value: s.id, label: s.code, sub: `${s.retired ? 'Retired · ' : ''}${s.subject} · ${s.description}` }));
 }
 
 // ---------------------------------------------------------------- permissions

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../lib/store.jsx';
-import { canEdit, makeTemplate, standardIndex, yearClasses } from '../lib/model.js';
+import { canEdit, makeTemplate, standardIndex, standardOptions, yearClasses } from '../lib/model.js';
 import { STRATEGIES } from '../data/presets.js';
 import { AttachmentEditor, libraryOptions } from '../components/LessonEditor.jsx';
 import { Empty, Field, MultiPicker } from '../components/ui.jsx';
@@ -18,7 +18,6 @@ export default function Templates() {
     return [...names];
   }, [state.classes, state.banks, state.templates]);
   const [newSection, setNewSection] = useState('');
-  const stdOptions = useMemo(() => Object.values(standardIndex(state)).map((s) => ({ value: s.id, label: s.code, sub: s.description })), [state]);
 
   const add = () => {
     const t = makeTemplate({ ownerId: userId, name: `Template ${state.templates.length + 1}` });
@@ -27,6 +26,7 @@ export default function Templates() {
   };
 
   const usedSections = tpl ? Object.keys(tpl.content) : [];
+  const stdOptions = standardOptions(standardIndex(state), tpl?.standardIds);
 
   return (
     <div className="page split">

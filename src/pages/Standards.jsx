@@ -1,6 +1,6 @@
 import { Fragment, useMemo, useState } from 'react';
 import { useStore } from '../lib/store.jsx';
-import { allFrameworks, canEdit, canView, uid, yearClasses } from '../lib/model.js';
+import { allFrameworks, canEdit, canView, isBuiltinFramework, uid, yearClasses } from '../lib/model.js';
 import { parseCSV, toCSV } from '../lib/csv.js';
 import { achievement, standardsCoverage } from '../lib/reports.js';
 import { formatDate, today } from '../lib/dates.js';
@@ -35,8 +35,9 @@ function Browse() {
   const fw = frameworks.find((f) => f.id === fwId);
   const fromCatalog = Boolean(fw?.source?.catalog);
   // Official state standards are read-only; teachers can remove or update the set.
-  const removable = state.frameworks.some((f) => f.id === fwId);
-  const custom = removable && !fromCatalog;
+  const builtin = isBuiltinFramework(fwId);
+  const custom = state.frameworks.some((f) => f.id === fwId) && !fromCatalog;
+  const hiddenCount = (state.hiddenFrameworks || []).length;
   const gradesOf = (s) => (s.grades?.length ? s.grades : s.grade ? [s.grade] : []);
   const grades = fw ? [...new Set(fw.standards.flatMap(gradesOf))] : [];
   const list = (fw?.standards || []).filter((s) => (!grade || gradesOf(s).includes(grade)) && (!q || `${s.code} ${s.description} ${s.group || ''}`.toLowerCase().includes(q.toLowerCase())));
@@ -67,9 +68,16 @@ function Browse() {
     const used = usedStandardIds(state);
     const tagged = fw.standards.filter((s) => used.has(s.id)).length;
     const msg = tagged
-      ? `Remove “${fw.name}”? ${tagged} of its standards are tagged in lessons, assignments or scores. The tags stay, but they’ll show as codes only until you add these standards again.`
+      ? `Remove “${fw.name}”? ${tagged} of its standards are tagged in lessons, assignments or scores. ${builtin ? 'Those tags keep working.' : 'The tags stay, but they’ll show as codes only until you add these standards again.'}`
       : `Remove “${fw.name}”?`;
-    if (window.confirm(msg)) update((d) => { d.frameworks = d.frameworks.filter((f) => f.id !== fw.id); });
+    if (!window.confirm(msg)) return;
+    update((d) => {
+      // Built-in samples are hidden rather than deleted, so they can come back.
+      if (builtin) d.hiddenFrameworks = [...new Set([...(d.hiddenFrameworks || []), fw.id])];
+      else d.frameworks = d.frameworks.filter((f) => f.id !== fw.id);
+    });
+    setFwId(frameworks.find((f) => f.id !== fw.id)?.id);
+    notify(`Removed ${fw.name}`, { undo: true });
   };
   const [form, setForm] = useState({ code: '', description: '', grade: '' });
   const [newFw, setNewFw] = useState('');
@@ -122,10 +130,16 @@ function Browse() {
             }}>+ Add</button>
           </div>
           <label className="btn">Import CSV<input type="file" accept=".csv,text/csv" hidden onChange={importCSV} /></label>
+          {hiddenCount > 0 && (
+            <button className="link-btn small" onClick={() => { update((d) => { d.hiddenFrameworks = []; }); notify('Sample frameworks restored'); }}>
+              Show {hiddenCount} removed sample {hiddenCount === 1 ? 'framework' : 'frameworks'}
+            </button>
+          )}
           <button className="link-btn small" onClick={() => download('standards-template.csv', toCSV([['framework', 'subject', 'code', 'grade', 'description'], ['My District Science', 'Science', 'SCI.6.1', '6', 'Describe…']]), 'text/csv')}>CSV template</button>
         </div>
       </aside>
       <section className="detail">
+        {!fw && <Empty>No standards yet. Use “+ Add state standards” to add your state’s, or create your own.</Empty>}
         {fw && (
           <>
             <div className="row wrap">
@@ -135,7 +149,7 @@ function Browse() {
                 {grades.map((g) => <option key={g} value={g}>{g === 'PK' ? 'Pre-K' : g === 'K' ? 'Kindergarten' : `Grade ${g}`}</option>)}
               </select>
               {fromCatalog && <button disabled={checking} onClick={checkForUpdate}>{checking ? 'Checking…' : 'Check for updates'}</button>}
-              {removable && <button className="danger" onClick={removeFramework}>{fromCatalog ? 'Remove' : 'Delete framework'}</button>}
+              <button className="danger" onClick={removeFramework}>Remove</button>
             </div>
             {fromCatalog && (
               <p className="small muted">

@@ -133,3 +133,22 @@ describe('build-standards script', () => {
     ]);
   });
 });
+
+describe('removing frameworks', () => {
+  it('hides built-in samples from lists and pickers but keeps labels for existing tags', async () => {
+    const { allFrameworks, standardIndex, standardOptions } = await import('../src/lib/model.js');
+    const state = { ...emptyState(), hiddenFrameworks: ['ccss-math'] };
+    expect(allFrameworks(state).some((f) => f.id === 'ccss-math')).toBe(false);
+    expect(allFrameworks(state, { includeHidden: true }).some((f) => f.id === 'ccss-math')).toBe(true);
+    const index = standardIndex(state);
+    expect(index['5.OA.A.1']).toMatchObject({ code: '5.OA.A.1', hidden: true });
+    expect(standardOptions(index).some((o) => o.value === '5.OA.A.1')).toBe(false);
+    expect(standardOptions(index, ['5.OA.A.1']).find((o) => o.value === '5.OA.A.1').label).toBe('5.OA.A.1');
+  });
+  it('leaves retired standards out of pickers unless already chosen', async () => {
+    const { standardOptions } = await import('../src/lib/model.js');
+    const index = { a: { id: 'a', code: 'A', subject: 'Math', description: 'x', retired: true }, b: { id: 'b', code: 'B', subject: 'Math', description: 'y' } };
+    expect(standardOptions(index).map((o) => o.value)).toEqual(['b']);
+    expect(standardOptions(index, ['a']).find((o) => o.value === 'a').sub).toBe('Retired · Math · x');
+  });
+});

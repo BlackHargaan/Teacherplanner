@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useStore } from '../lib/store.jsx';
-import { makeYear, rolloverYear, uid, yearClasses } from '../lib/model.js';
-import { CANCELLED_ROTATION, CYCLE_NAMES, NON_SCHOOL_KINDS, SCHEDULE_TYPES, dayKeyLabel, schoolDays, splitGradingPeriods } from '../lib/schedule.js';
+import { makeYear, rolloverDays, rolloverYear, uid, yearClasses } from '../lib/model.js';
+import { CANCELLED_ROTATION, CYCLE_NAMES, NON_SCHOOL_KINDS, SCHEDULE_TYPES, dayKeyLabel, schoolDays, setCycleLength, splitGradingPeriods } from '../lib/schedule.js';
 import { periodTimesFrom } from '../lib/bells.js';
-import { DOW_SHORT, addDays, formatDate, shiftYear } from '../lib/dates.js';
+import { DOW_SHORT, addDays, dateRangeError, formatDate, isFullDate } from '../lib/dates.js';
 import { Field, Modal, Empty } from '../components/ui.jsx';
 import YearCalendar from '../components/YearCalendar.jsx';
 import BellSchedule from '../components/BellSchedule.jsx';
@@ -21,6 +21,11 @@ export default function Setup() {
   const classes = yearClasses(state, year.id);
   // Joined a school as a member: its shared schedule is read-only here.
   const readOnly = schoolReadOnly(year);
+  const changeCycleLength = (length) => {
+    let hidden = 0;
+    editYear((y) => { hidden = setCycleLength(y, length, classes); });
+    if (hidden) notify(`${hidden} class meeting ${hidden === 1 ? 'time is' : 'times are'} on days past ${dayKeyLabel(`C${length}`, year)} and won’t show unless the cycle gets longer again.`);
+  };
   const firstDayName = `${year.cycleNames === 'letters' ? 'an' : 'a'} ${dayKeyLabel('C1', year)}`;
 
   return (
@@ -43,10 +48,7 @@ export default function Setup() {
           <h2>Calendar</h2>
           <Field label="Name"><input value={year.name} onChange={(e) => setYear({ name: e.target.value })} /></Field>
           <fieldset className="plain-fieldset" disabled={readOnly}>
-              <div className="row">
-                <Field label="First day"><input type="date" value={year.start} onChange={(e) => setYear({ start: e.target.value })} /></Field>
-                <Field label="Last day"><input type="date" value={year.end} onChange={(e) => setYear({ end: e.target.value })} /></Field>
-              </div>
+              <YearDates start={year.start} end={year.end} onChange={setYear} />
               <Field label="School days of the week">
                 <div className="row wrap">
                   {[1, 2, 3, 4, 5, 6, 0].map((d) => (
@@ -64,7 +66,7 @@ export default function Setup() {
               </Field>
               {year.scheduleType === 'cycle' && (
                 <div className="row">
-                  <Field label="Days in cycle"><input type="number" min="2" max="20" value={year.cycleLength} onChange={(e) => setYear({ cycleLength: Number(e.target.value) })} /></Field>
+                  <CycleLength value={year.cycleLength} onChange={changeCycleLength} />
                   <Field label="First day of year is"><select value={year.cycleStartDay} onChange={(e) => setYear({ cycleStartDay: Number(e.target.value) })}>
                     {Array.from({ length: year.cycleLength }, (_, i) => <option key={i} value={i + 1}>{dayKeyLabel(`C${i + 1}`, year)}</option>)}
                   </select></Field>
@@ -305,13 +307,60 @@ function DayTypes({ year, editYear, classes, readOnly }) {
   );
 }
 
+/**
+ * First and last day inputs. Half-typed dates (a year still being typed) and
+ * a last day before the first stay here, with a message, instead of being
+ * saved and emptying the calendar.
+ */
+function YearDates({ start, end, onChange }) {
+  const [draft, setDraft] = useState({ start, end });
+  useEffect(() => setDraft({ start, end }), [start, end]);
+  const error = dateRangeError(draft.start, draft.end);
+  const edit = (patch) => {
+    const next = { ...draft, ...patch };
+    setDraft(next);
+    if (!dateRangeError(next.start, next.end)) onChange(next);
+  };
+  return (
+    <>
+      <div className="row">
+        <Field label="First day"><input type="date" value={draft.start} onChange={(e) => edit({ start: e.target.value })} /></Field>
+        <Field label="Last day"><input type="date" value={draft.end} onChange={(e) => edit({ end: e.target.value })} /></Field>
+      </div>
+      {error && <p className="small error-text">{error}</p>}
+    </>
+  );
+}
+
+/** "Days in cycle": saved only once it's a whole number from 2 to 20. */
+function CycleLength({ value, onChange }) {
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => setDraft(String(value)), [value]);
+  const n = Number(draft);
+  const valid = Number.isInteger(n) && n >= 2 && n <= 20;
+  return (
+    <Field label="Days in cycle" hint={valid ? null : <span className="error-text">2 to 20 days</span>}>
+      <input type="number" min="2" max="20" value={draft} onChange={(e) => {
+        setDraft(e.target.value);
+        const len = Number(e.target.value);
+        if (Number.isInteger(len) && len >= 2 && len <= 20 && len !== value) onChange(len);
+      }} />
+    </Field>
+  );
+}
+
 function RolloverDialog({ onClose, onDone }) {
   const { state, update, year } = useStore();
   const [name, setName] = useState(year.name.replace(/(\d{4})/g, (m) => String(Number(m) + 1)));
-  const [start, setStart] = useState(shiftYear(year.start, 1));
-  const [end, setEnd] = useState(shiftYear(year.end, 1));
+  // Whole weeks (52 by default) so the first day stays the same weekday; the
+  // last day follows the chosen first day until it's changed by hand.
+  const [start, setStart] = useState(addDays(year.start, rolloverDays(year.start)));
+  const [endEdit, setEndEdit] = useState(null);
+  const end = endEdit ?? addDays(year.end, rolloverDays(year.start, isFullDate(start) ? start : null));
   const [copyLessons, setCopyLessons] = useState(true);
+  const error = dateRangeError(start, end);
   const go = () => {
+    if (error) return;
     const out = rolloverYear(state, year.id, { name, start, end, copyLessons });
     update((d) => {
       d.years.push(out.year);
@@ -324,13 +373,14 @@ function RolloverDialog({ onClose, onDone }) {
   };
   return (
     <Modal title="Re-use this year’s schedule and lessons" onClose={onClose}
-      footer={<><span className="grow" /><button onClick={onClose}>Cancel</button><button className="primary" onClick={go}>Create year</button></>}>
-      <p className="small">Copies classes, sections, meeting times, templates, alternate day schedules and holidays (shifted one year). Rosters and grades start empty. Last year stays unchanged.</p>
+      footer={<><span className="grow" /><button onClick={onClose}>Cancel</button><button className="primary" onClick={go} disabled={!!error}>Create year</button></>}>
+      <p className="small">Copies classes, sections, meeting times, templates, alternate day schedules and holidays (moved to the same weekdays next year). Rosters and grades start empty. Last year stays unchanged.</p>
       <Field label="New year name"><input value={name} onChange={(e) => setName(e.target.value)} /></Field>
       <div className="row">
         <Field label="First day"><input type="date" value={start} onChange={(e) => setStart(e.target.value)} /></Field>
-        <Field label="Last day"><input type="date" value={end} onChange={(e) => setEnd(e.target.value)} /></Field>
+        <Field label="Last day"><input type="date" value={end} onChange={(e) => setEndEdit(e.target.value)} /></Field>
       </div>
+      {error && <p className="small error-text">{error}</p>}
       <label className="row"><input type="checkbox" checked={copyLessons} onChange={(e) => setCopyLessons(e.target.checked)} /> Copy lessons in the same order (they’ll flow onto the new calendar)</label>
     </Modal>
   );

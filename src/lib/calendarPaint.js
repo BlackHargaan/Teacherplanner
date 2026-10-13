@@ -61,7 +61,9 @@ export function paintDates(year, dates, brush) {
   const off = offDayMap(year);
   for (const d of schoolWeek) {
     off.delete(d);
-    delete year.dayAssignments[d];
+    // A cancelled day keeps its alternate schedule: in a rotation, whether
+    // that day counted decides whether the cycle moves on.
+    if (brush.kind !== 'cancelled') delete year.dayAssignments[d];
     if (brush.kind === 'holiday' || brush.kind === 'workday' || brush.kind === 'cancelled') {
       off.set(d, { label: brush.label || defaultLabel(brush.kind), kind: brush.kind });
     } else if (brush.kind === 'dayType') {

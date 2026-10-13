@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useStore } from '../lib/store.jsx';
 import { uid } from '../lib/model.js';
 import { formatDate } from '../lib/dates.js';
-import { USES, applyImport, downloadCalendar, importRows, parseICS, schoolYearsIn, termsFromEnds } from '../lib/icsImport.js';
+import { USES, applyImport, downloadCalendar, importRows, parseICS, schoolYearsIn, termsFromEnds, yearBounds } from '../lib/icsImport.js';
 import { Field, Modal } from './ui.jsx';
 
 const NEW_EARLY = '__new__';
@@ -70,8 +70,11 @@ export default function CalendarImport({ year, onClose }) {
   const setRow = (key, patch) => setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
   const active = rows.filter((r) => r.use !== 'ignore' || r.termEnd);
   const listed = showAll ? rows : rows.filter((r) => r.suggested || r.use !== 'ignore' || r.termEnd);
-  const first = active.find((r) => r.use === 'firstDay');
-  const last = [...active].reverse().find((r) => r.use === 'lastDay');
+  const bounds = yearBounds(active);
+  // A last day before the first day can't be used (applyImport skips it too).
+  const boundsOk = (bounds.last ? bounds.last.end : year.end) >= (bounds.first ? bounds.first.start : year.start);
+  const first = boundsOk ? bounds.first : null;
+  const last = boundsOk ? bounds.last : null;
   const termEnds = active.filter((r) => r.termEnd || r.use === 'termEnd');
   const previewTerms = termsFromEnds(termEnds, setBounds && first ? first.start : year.start, setBounds && last ? last.end : year.end);
   const hasEarly = active.some((r) => r.use === 'early');
@@ -150,7 +153,7 @@ export default function CalendarImport({ year, onClose }) {
           {existingOff > 0 && (
             <label className="row small">
               <input type="checkbox" checked={replaceDaysOff} onChange={(e) => setReplaceDaysOff(e.target.checked)} />
-              Replace the {existingOff} {existingOff === 1 ? 'break or day off' : 'breaks and days off'} already in this year (cancelled days stay)
+              Replace the {existingOff} {existingOff === 1 ? 'break or day off' : 'breaks and days off'}{hasEarly ? ' and early release days' : ''} already in this year (cancelled days stay)
             </label>
           )}
           {(first || last) && (

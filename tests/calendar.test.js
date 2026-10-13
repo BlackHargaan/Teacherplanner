@@ -121,7 +121,7 @@ describe('rollover', () => {
     };
     const out = rolloverYear({ years: [year], classes: [], lessons: {} }, 'y1', { name: 'Next', start: '2027-09-06', end: '2027-09-24' });
     expect(out.year.periods).toEqual(year.periods);
-    expect(out.year.gradingPeriods.map((g) => [g.name, g.start, g.end])).toEqual([['Q1', '2027-09-07', '2027-09-25']]);
+    expect(out.year.gradingPeriods.map((g) => [g.name, g.start, g.end])).toEqual([['Q1', '2027-09-06', '2027-09-24']]); // 52 weeks on: still Mon–Fri
     expect(out.year.nonSchoolDays.map((r) => r.label)).toEqual(['Holiday']);
     expect(out.year.rotationOverrides).toEqual({});
   });

@@ -1,17 +1,33 @@
 // iCalendar (RFC 5545) export so plans can be imported into Google Calendar,
 // Outlook or Apple Calendar.
 
-const esc = (s) => String(s || '').replace(/\\/g, '\\\\').replace(/;/g, '\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+const esc = (s) => String(s || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
 
-/** Fold lines longer than 75 octets as required by RFC 5545. */
+/** UTF-8 length of one character (code point). */
+const octets = (ch) => {
+  const cp = ch.codePointAt(0);
+  return cp < 0x80 ? 1 : cp < 0x800 ? 2 : cp < 0x10000 ? 3 : 4;
+};
+
+/**
+ * Fold lines longer than 75 octets (UTF-8 bytes) as required by RFC 5545,
+ * breaking only between characters so accents and emoji stay whole.
+ */
 function fold(line) {
   const out = [];
-  let rest = line;
-  while (rest.length > 74) {
-    out.push(rest.slice(0, 74));
-    rest = ` ${rest.slice(74)}`;
+  let cur = '';
+  let size = 0;
+  for (const ch of line) { // for…of walks whole code points, never half an emoji
+    const n = octets(ch);
+    if (size + n > 75) {
+      out.push(cur);
+      cur = ' '; // continuation lines start with a space, which counts too
+      size = 1;
+    }
+    cur += ch;
+    size += n;
   }
-  out.push(rest);
+  out.push(cur);
   return out.join('\r\n');
 }
 

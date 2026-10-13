@@ -44,6 +44,14 @@ function editingText() {
 export default function App() {
   const { state, update, undo, redo, notify, toast, year } = useStore();
   const [route, param] = useHashRoute();
+  const [menuOpen, setMenuOpen] = useState(false);
+  useEffect(() => setMenuOpen(false), [route, param]); // close the menu after picking a page
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') { setMenuOpen(false); document.querySelector('.nav-toggle')?.focus(); } };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [menuOpen]);
   const appearance = state ? currentUser(state)?.appearance : undefined;
   useEffect(() => { applyAppearance(appearance); }, [appearance?.palette, appearance?.mode]);
   // Desktop menu items (e.g. Help → Check for Updates…) can open a page.
@@ -86,8 +94,18 @@ export default function App() {
     <div className="app">
       <header className="topbar no-print">
         <a className="brand" href="#/planner">📘 Teacher Planner</a>
-        <nav>
-          {PAGES.map(([p, label]) => <a key={p} href={`#/${p}`} className={p === id ? 'on' : ''}>{label}</a>)}
+        {/* On narrow windows the page links fold into this menu. */}
+        <button
+          type="button"
+          className="nav-toggle"
+          aria-expanded={menuOpen}
+          aria-controls="main-nav"
+          onClick={() => setMenuOpen((o) => !o)}
+        >
+          <span aria-hidden="true">☰</span> {menuOpen ? 'Close' : PAGES.find(([p]) => p === id)?.[1] || 'Menu'}
+        </button>
+        <nav id="main-nav" className={menuOpen ? 'open' : ''} aria-label="Pages">
+          {PAGES.map(([p, label]) => <a key={p} href={`#/${p}`} className={p === id ? 'on' : ''} aria-current={p === id ? 'page' : undefined}>{label}</a>)}
         </nav>
         <SearchBox initial={route === 'search' ? decodeURIComponent(param || '') : ''} />
         <CloudStatus />

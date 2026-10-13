@@ -57,7 +57,7 @@ export default function Templates() {
                 </div>
               </Field>
             ))}
-            <div className="row">
+            <div className="row wrap">
               <input list="section-names" placeholder="Section name" value={newSection} onChange={(e) => setNewSection(e.target.value)} />
               <datalist id="section-names">{sectionNames.filter((n) => !usedSections.includes(n)).map((n) => <option key={n} value={n} />)}</datalist>
               <button disabled={!newSection.trim()} onClick={() => { edit((t) => { t.content[newSection.trim()] = t.content[newSection.trim()] || ''; }); setNewSection(''); }}>+ Add section content</button>

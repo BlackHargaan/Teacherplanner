@@ -108,7 +108,7 @@ function BankDetail({ bank, onLink }) {
 
   return (
     <>
-      <div className="row">
+      <div className="row wrap">
         <input className="title-input grow" value={bank.name} disabled={!editable} onChange={(e) => edit((b) => { b.name = e.target.value; })} />
         <input type="color" value={bank.color} disabled={!editable} onChange={(e) => edit((b) => { b.color = e.target.value; })} />
         <button className="primary" onClick={onLink}>Link into my class…</button>

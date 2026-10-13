@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { cloneState, demoState, emptyState, currentYear, yearClasses } from './model.js';
 import { buildCalendar } from './schedule.js';
-import { createHistory, record, undo as undoStep, redo as redoStep } from './history.js';
+import { applyToHistory, createHistory, record, undo as undoStep, redo as redoStep } from './history.js';
 
 const KEY = 'teacher-planner:v1';
 export const StoreContext = createContext(null);
@@ -107,24 +107,31 @@ export function StoreProvider({ children }) {
     return () => clearTimeout(t);
   }, [toast]);
 
-  /** Apply a mutation to a deep copy of state (undoable). */
-  const update = useCallback((fn) => {
+  /**
+   * Apply a mutation to a deep copy of state (undoable). Quick edits merge
+   * into one undo step; pass { separate: true } for things like deleting,
+   * which should always be undoable on their own.
+   */
+  const update = useCallback((fn, { separate = false } = {}) => {
     const prev = latest.current;
     const draft = cloneState(prev);
     fn(draft);
-    history.current = record(history.current, prev);
+    history.current = record(history.current, prev, Date.now(), separate);
     latest.current = draft;
     setState(draft);
   }, []);
 
   /**
    * Apply changes that came from elsewhere (online sync). Saved, but not an
-   * undo step — undoing must never roll back a teammate's edit.
+   * undo step — undoing must never roll back a teammate's edit, so the change
+   * is applied to the undo history as well (skip that with { history: false }
+   * when it changes nothing the history doesn't already have).
    */
-  const applyRemote = useCallback((fn) => {
+  const applyRemote = useCallback((fn, { history: patchHistory = true } = {}) => {
     if (!latest.current) return;
     const draft = cloneState(latest.current);
     fn(draft);
+    if (patchHistory) history.current = applyToHistory(history.current, fn);
     skipSave.current = false;
     latest.current = draft;
     setState(draft);

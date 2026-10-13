@@ -50,3 +50,30 @@ export function pruneOrphans(d) {
   for (const c of [...d.classes, ...d.banks]) for (const id of c.sequence || []) if (id) used.add(id);
   for (const id of Object.keys(d.lessons)) if (!used.has(id)) delete d.lessons[id];
 }
+
+/**
+ * A bank (or some of its lessons) is going away: deleted, left, or removed
+ * online by a teammate. Lessons linked into a class become that class's own
+ * lessons (sections matched by name) so plans keep working; unlinked ones go.
+ * onlyIds limits this to particular lessons.
+ */
+export function releaseBankLessons(d, bankId, userId, onlyIds = null) {
+  const bank = d.banks.find((b) => b.id === bankId);
+  for (const lesson of Object.values(d.lessons)) {
+    if (lesson.homeType !== 'bank' || lesson.homeId !== bankId) continue;
+    if (onlyIds && !onlyIds.has(lesson.id)) continue;
+    const cls = d.classes.find((c) => (c.sequence || []).includes(lesson.id));
+    if (!cls) {
+      delete d.lessons[lesson.id];
+      continue;
+    }
+    if (bank) lesson.content = remapContent(lesson.content || {}, bank.sections || [], cls.sections || []);
+    Object.assign(lesson, { homeType: 'class', homeId: cls.id, ownerId: userId, updatedAt: Date.now() });
+  }
+}
+
+/** Delete a bank from this planner, keeping lessons that classes use. */
+export function deleteBankLocally(d, bankId, userId) {
+  releaseBankLessons(d, bankId, userId);
+  d.banks = d.banks.filter((b) => b.id !== bankId);
+}

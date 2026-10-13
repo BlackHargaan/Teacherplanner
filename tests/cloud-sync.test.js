@@ -155,3 +155,59 @@ describe('online team banks — sync', () => {
     expect(c.title).toBe('X');
   });
 });
+
+describe('online team banks — review fixes', () => {
+  it('a lesson a teammate deletes online is not uploaded again by someone who linked it', () => {
+    const { server, ana, ben } = setup();
+    const cls = ben.classes[0];
+    cls.sequence.push('les-2'); // Ben uses Mitosis in his class
+    // Ana deletes Mitosis from the bank
+    ana.banks[0].sequence = ['les-1'];
+    delete ana.lessons['les-2'];
+    sync(server, ana, 'ana');
+    expect(server.lessons.has('bank-team/les-2')).toBe(false);
+    sync(server, ben, 'ben');
+    expect(ben.lessons['les-2']).toMatchObject({ homeType: 'class', homeId: cls.id, title: 'Mitosis' }); // Ben keeps his copy
+    const again = sync(server, ben, 'ben');
+    expect(again.lessons.map((l) => l.id)).not.toContain('les-2');
+    expect(server.lessons.has('bank-team/les-2')).toBe(false);
+  });
+
+  it('a bank shared a moment ago is not marked "no longer shared" by an older snapshot', () => {
+    const { server, ana } = setup();
+    const before = server.snapshot('ana'); // fetched before the new bank was online
+    const fresh = makeBank({ id: 'bank-new', ownerId: ana.currentUserId, name: 'New' });
+    fresh.cloud = { role: 'owner', members: [], invites: [] };
+    ana.banks.push(fresh);
+    applySnapshot(ana, before, ana.currentUserId);
+    expect(ana.banks.find((b) => b.id === 'bank-new').cloud).toMatchObject({ role: 'owner' });
+    expect(ana.banks.find((b) => b.id === 'bank-new').cloud.revoked).toBeUndefined();
+    sync(server, ana, 'ana');
+    expect(server.banks.has('bank-new')).toBe(true);
+  });
+
+  it('an online lesson cannot take over a lesson that lives in another bank or class', () => {
+    const { server, ben } = setup();
+    const mine = ben.classes[0].sequence.find(Boolean);
+    const original = structuredClone(ben.lessons[mine]);
+    // Someone with edit rights on the team bank uploads a row reusing that id
+    server.lessons.set(`bank-team/${mine}`, { id: mine, bank_id: 'bank-team', data: { title: 'Hijacked', content: {} } });
+    sync(server, ben, 'ben');
+    expect(ben.lessons[mine]).toMatchObject({ homeType: original.homeType, homeId: original.homeId, title: original.title });
+  });
+});
+
+describe('reading online data', () => {
+  it('reads past the server’s 1000-row limit in pages', async () => {
+    const { fetchAll } = await import('../src/lib/cloud/backend.js');
+    const rows = Array.from({ length: 2345 }, (_, i) => ({ id: i }));
+    const ranges = [];
+    const makeQuery = () => ({ range: async (from, to) => { ranges.push([from, to]); return { data: rows.slice(from, to + 1), error: null }; } });
+    const all = await fetchAll(makeQuery);
+    expect(all).toHaveLength(2345);
+    expect(ranges).toEqual([[0, 999], [1000, 1999], [2000, 2999]]);
+    const exact = await fetchAll(() => ({ range: async (from, to) => ({ data: rows.slice(0, 2000).slice(from, to + 1), error: null }) }));
+    expect(exact).toHaveLength(2000);
+    await expect(fetchAll(() => ({ range: async () => ({ data: null, error: new Error('nope') }) }))).rejects.toThrow('nope');
+  });
+});

@@ -3,7 +3,7 @@ import { useStore } from '../lib/store.jsx';
 import { makeYear, rolloverYear, uid, yearClasses } from '../lib/model.js';
 import { CANCELLED_ROTATION, CYCLE_NAMES, NON_SCHOOL_KINDS, SCHEDULE_TYPES, dayKeyLabel, schoolDays, splitGradingPeriods } from '../lib/schedule.js';
 import { periodTimesFrom } from '../lib/bells.js';
-import { DOW_SHORT, formatDate, shiftYear } from '../lib/dates.js';
+import { DOW_SHORT, addDays, formatDate, shiftYear } from '../lib/dates.js';
 import { Field, Modal, Empty } from '../components/ui.jsx';
 import YearCalendar from '../components/YearCalendar.jsx';
 import BellSchedule from '../components/BellSchedule.jsx';
@@ -144,8 +144,9 @@ function NonSchoolDays({ year, editYear }) {
     <details className="nsd-list">
       <summary>Days without classes ({list.length})</summary>
       <ul className="list">
-        {list.map((r) => (
-          <li key={`${r.start}-${r.label}`}>
+        {/* Keyed by date, not name, so typing a new name doesn't rebuild the row and lose focus. */}
+        {list.map((r, i) => (
+          <li key={`${r.start}-${i}`}>
             <span className="nowrap">{formatDate(r.start)}{r.end && r.end !== r.start ? ` – ${formatDate(r.end)}` : ''}</span>
             <input className="grow" aria-label="Name" value={r.label} onChange={(e) => editYear((y) => { find(y, r).label = e.target.value; })} />
             <select aria-label="Kind" value={r.kind || 'holiday'} onChange={(e) => editYear((y) => { const x = find(y, r); if (e.target.value === 'holiday') delete x.kind; else x.kind = e.target.value; })}>
@@ -173,7 +174,7 @@ function GradingPeriods({ year, editYear }) {
       <h2>Grading periods</h2>
       <div className="row wrap">
         {TERM_SPLITS.map(([label, n, name]) => <button key={label} onClick={() => fill(n, name)}>{label}</button>)}
-        <button onClick={() => editYear((y) => { y.gradingPeriods = [...(y.gradingPeriods || []), { id: uid('term'), name: `Term ${list.length + 1}`, start: list.at(-1)?.end || y.start, end: y.end }]; })}>+ Add</button>
+        <button onClick={() => editYear((y) => { y.gradingPeriods = [...(y.gradingPeriods || []), { id: uid('term'), name: `Term ${list.length + 1}`, start: list.length ? addDays(list.at(-1).end, 1) : y.start, end: y.end }]; })}>+ Add</button>
       </div>
       {list.length === 0 ? <p className="small muted">Split the year evenly, then adjust the dates to match your district calendar.</p> : (
         <table className="table compact">

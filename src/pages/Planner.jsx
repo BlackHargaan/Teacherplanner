@@ -165,7 +165,7 @@ function DayMenu({ date, day, removed, onDialog }) {
         {
           label: 'Cancel this day (snow day…)',
           onClick: () => {
-            update((d) => paintDates(d.years.find((x) => x.id === year.id), [date], { kind: 'cancelled', label: 'Cancelled' }));
+            update((d) => paintDates(d.years.find((x) => x.id === year.id), [date], { kind: 'cancelled', label: 'Cancelled' }), { separate: true });
             notify('Day cancelled. Its lessons moved to the next class meetings.', { undo: true });
           },
         },

@@ -3,12 +3,13 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useStore } from '../store.jsx';
 import { cloudConfigured } from './config.js';
 import * as api from './backend.js';
-import { applySnapshot, changesToPush, detachBank, markPushed } from './sync.js';
-import { pruneOrphans } from '../actions.js';
+import { applySnapshot, changesToPush, detachBank, fingerprint, markPushed } from './sync.js';
+import { deleteBankLocally } from '../actions.js';
 
 const CloudContext = createContext({ configured: false });
 const SYNC_EVERY_MS = 2 * 60 * 1000;
 const PUSH_DELAY_MS = 1500;
+const CHECK_DELAY_MS = 400;
 
 const hasChanges = (ch) => ch.banks.length + ch.lessons.length + ch.deletes.length > 0;
 
@@ -18,6 +19,7 @@ export function CloudProvider({ children }) {
   const [status, setStatus] = useState(cloudConfigured ? 'starting' : 'off'); // off | starting | signed-out | syncing | synced | offline | error
   const [error, setError] = useState(null);
   const running = useRef(false);
+  const lastSnap = useRef(null);
   const again = useRef(false);
   const user = session?.user || null;
 
@@ -43,7 +45,11 @@ export function CloudProvider({ children }) {
           applyRemote((d) => markPushed(d, ch));
         }
         const snap = await api.fetchSnapshot(user.id);
-        applyRemote((d) => applySnapshot(d, snap, d.currentUserId));
+        // Teammates' changes also go into undo history (see applyRemote);
+        // skip that work when nothing online changed since the last pull.
+        const snapPrint = fingerprint(snap);
+        applyRemote((d) => applySnapshot(d, snap, d.currentUserId), { history: snapPrint !== lastSnap.current });
+        lastSnap.current = snapPrint;
       } while (again.current);
       setError(null);
       setStatus('synced');
@@ -77,8 +83,15 @@ export function CloudProvider({ children }) {
     };
   }, [user?.id, plannerLoaded, sync]);
 
-  // Push soon after local edits to a shared bank.
-  const pending = useMemo(() => (user && state ? hasChanges(changesToPush(state)) : false), [state, user]);
+  // Push soon after local edits to a shared bank. Checking means
+  // fingerprinting every shared lesson, so wait for a pause in typing rather
+  // than doing it on every keystroke.
+  const [pending, setPending] = useState(false);
+  useEffect(() => {
+    if (!user || !state) { setPending(false); return undefined; }
+    const t = setTimeout(() => setPending(hasChanges(changesToPush(latest.current))), CHECK_DELAY_MS);
+    return () => clearTimeout(t);
+  }, [state, user, latest]);
   useEffect(() => {
     if (!pending) return undefined;
     const t = setTimeout(sync, PUSH_DELAY_MS);
@@ -125,11 +138,10 @@ export function CloudProvider({ children }) {
         await api.removeMember(bankId, user.id);
       }
       applyRemote((d) => {
-        d.banks = d.banks.filter((b) => b.id !== bankId);
+        deleteBankLocally(d, bankId, d.currentUserId);
         for (const key of Object.keys(d.cloud?.shadow || {})) {
           if (key === `b:${bankId}` || key.startsWith(`l:${bankId}:`)) delete d.cloud.shadow[key];
         }
-        pruneOrphans(d);
       });
     },
     invite: async (bankId, email, role) => {

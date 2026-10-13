@@ -4,7 +4,7 @@
 // meetings, testing windows), so events are classified by name and the
 // teacher reviews the result before anything changes.
 import { addDays, dayOfWeek } from './dates.js';
-import { datesBetween, paintDates } from './calendarPaint.js';
+import { datesBetween, offDayMap, paintDates } from './calendarPaint.js';
 
 // ---------------------------------------------------------------- parsing
 
@@ -169,10 +169,20 @@ export function schoolYearsIn(events) {
  * suggested use. Rows are sorted by date; `shown` hides the noise.
  */
 export function importRows(events, from, to) {
+  // One occurrence of a repeating event changed or cancelled in the calendar
+  // (RECURRENCE-ID) replaces the date the repeat would have produced.
+  const replaced = new Map();
+  for (const e of events) {
+    const date = e.recurrenceId && parseStamp(e.recurrenceId)?.date;
+    if (!date) continue;
+    if (!replaced.has(e.uid)) replaced.set(e.uid, new Set());
+    replaced.get(e.uid).add(date);
+  }
   const rows = [];
   for (const e of events) {
     if (e.cancelled) continue;
     for (const o of occurrences(e, from, to)) {
+      if (e.rrule && replaced.get(e.uid)?.has(o.start)) continue;
       const { use, termEnd } = classify(o.summary, o.allDay);
       rows.push({
         key: `${o.uid}|${o.recurrenceId || ''}|${o.start}`,
@@ -187,7 +197,7 @@ export function importRows(events, from, to) {
       });
     }
   }
-  // A modified single occurrence (RECURRENCE-ID) replaces the generated one.
+  // The same event listed twice on a date shows once.
   const seen = new Set();
   return rows
     .sort((a, b) => a.start.localeCompare(b.start) || a.summary.localeCompare(b.summary))
@@ -255,8 +265,9 @@ export function applyImport(year, rows, opts = {}) {
       paintDates(year, dates, { kind: r.use, label: cleanLabel(r.summary) });
       counts.off += dates.length;
     } else if (r.use === 'early' && opts.earlyTypeId) {
-      const dates = schoolDaysOf(r);
-      paintDates(year, dates, { kind: 'dayType', id: opts.earlyTypeId });
+      // Never turn a day off (a kept snow day or break) back into a school day.
+      const off = offDayMap(year);
+      paintDates(year, schoolDaysOf(r).filter((d) => !off.has(d)), { kind: 'dayType', id: opts.earlyTypeId });
     } else if (r.use === 'rotation' && year.scheduleType === 'cycle') {
       const s = r.summary.trim().toLowerCase();
       const n = s.startsWith('day') ? Number(s.slice(4)) : s.charCodeAt(0) - 96;

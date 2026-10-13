@@ -1,5 +1,7 @@
 // Sync between the local planner and online team lesson banks.
 //
+import { releaseBankLessons } from '../actions.js';
+
 // Pure functions only (no network): the CloudProvider calls these with what
 // it fetched. Model:
 //   * A shared bank lives in the planner like any other bank, plus a
@@ -81,6 +83,7 @@ export function changesToPush(state) {
 
 /** After a successful push, record what was sent as the new synced state. */
 export function markPushed(d, pushed) {
+  d.cloud ||= {};
   d.cloud.shadow ||= {};
   for (const row of pushed.banks) d.cloud.shadow[bankKey(row.id)] = fingerprint(row);
   for (const row of pushed.lessons) d.cloud.shadow[lessonKey(row.bank_id, row.id)] = fingerprint(row.data);
@@ -137,6 +140,9 @@ export function applySnapshot(d, snapshot, localUserId) {
     for (const r of remote) {
       const key = lessonKey(row.id, r.id);
       const local = d.lessons[r.id];
+      // Lesson ids are only unique within a bank online; never let a row in one
+      // bank take over a lesson that lives in another bank or a class.
+      if (local && (local.homeType !== 'bank' || local.homeId !== row.id)) continue;
       if (local && isDirty(key, toCloudLesson(local))) continue; // unsent local edit wins until pushed
       d.lessons[r.id] = {
         ...r.data,
@@ -155,14 +161,17 @@ export function applySnapshot(d, snapshot, localUserId) {
       const key = lessonKey(row.id, lesson.id);
       if (remoteIds.has(lesson.id) || shadow[key] === undefined || isDirty(key, toCloudLesson(lesson))) continue;
       delete shadow[key];
-      const linked = d.classes.some((c) => c.sequence.includes(lesson.id));
-      if (!linked) delete d.lessons[lesson.id];
+      // Linked into a class? It becomes that class's own lesson, so it isn't
+      // uploaded again as if it were new.
+      releaseBankLessons(d, row.id, localUserId, new Set([lesson.id]));
     }
   }
 
-  // Banks we can no longer see online: keep the local copy, read-only.
+  // Banks we can no longer see online: keep the local copy, read-only. Only
+  // banks that were online before count; one shared a moment ago may simply
+  // not be in this snapshot yet.
   for (const bank of d.banks) {
-    if (bank.cloud && !bank.cloud.revoked && !seen.has(bank.id)) {
+    if (bank.cloud && !bank.cloud.revoked && !seen.has(bank.id) && shadow[bankKey(bank.id)] !== undefined) {
       bank.cloud = { ...bank.cloud, revoked: true, role: 'view' };
       if (bank.ownerId === localUserId) bank.ownerId = 'cloud:gone';
       bank.sharing = { [localUserId]: 'view' };

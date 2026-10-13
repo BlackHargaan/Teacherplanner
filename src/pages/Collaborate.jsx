@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useStore } from '../lib/store.jsx';
 import { canEdit, canView, containerRole, makeBank, makeLesson } from '../lib/model.js';
-import { copyLesson, editSequence, pruneOrphans } from '../lib/actions.js';
+import { copyLesson, deleteBankLocally, editSequence, pruneOrphans } from '../lib/actions.js';
+import { useCloud } from '../lib/cloud/CloudProvider.jsx';
 import { insertAt, pullBack, swap } from '../lib/sequence.js';
 import { meetingIndexOnOrAfter } from '../lib/schedule.js';
 import { formatDate, today } from '../lib/dates.js';
@@ -17,7 +18,7 @@ export default function Collaborate() {
   const sharedClasses = state.classes.filter((c) => c.ownerId !== userId && canView(c, userId));
   const [selected, setSelected] = useState(banks[0]?.id);
   const [linking, setLinking] = useState(null);
-  const bank = banks.find((b) => b.id === selected);
+  const bank = banks.find((b) => b.id === selected) || banks[0];
 
   const newBank = () => {
     const b = makeBank({ ownerId: userId, name: 'New Team Bank' });
@@ -57,6 +58,43 @@ export default function Collaborate() {
 
 function BankDetail({ bank, onLink }) {
   const { state, update, userId, notify } = useStore();
+  const cloud = useCloud();
+  const [removing, setRemoving] = useState(false);
+  const linkedCount = state.classes.filter((c) => bank.sequence.some((id) => id && c.sequence.includes(id))).length;
+  const keepNote = linkedCount ? ' Lessons you’ve linked into your classes stay in those classes.' : '';
+  // Owners delete (online too, for a shared bank); everyone else leaves.
+  const isOwner = bank.cloud ? bank.cloud.role === 'owner' && !bank.cloud.revoked : bank.ownerId === userId;
+
+  const remove = async () => {
+    const online = bank.cloud && !bank.cloud.revoked;
+    const question = isOwner
+      ? online
+        ? `Delete “${bank.name}” for everyone you shared it with? This can’t be undone.${keepNote}`
+        : `Delete “${bank.name}”?${keepNote}`
+      : `Leave “${bank.name}”? It’s removed from your planner.${keepNote}`;
+    if (!window.confirm(question)) return;
+    setRemoving(true);
+    try {
+      if (bank.cloud?.revoked) {
+        await cloud.leaveBank(bank.id, { alreadyGone: true });
+        notify(`Removed ${bank.name} from your planner`);
+      } else if (!online) {
+        update((d) => deleteBankLocally(d, bank.id, userId), { separate: true });
+        notify(`Deleted ${bank.name}`, { undo: true });
+      } else if (isOwner) {
+        await cloud.unpublishBank(bank.id);
+        update((d) => deleteBankLocally(d, bank.id, userId));
+        notify(`Deleted ${bank.name} for everyone`);
+      } else {
+        await cloud.leaveBank(bank.id);
+        notify(`You left ${bank.name}`);
+      }
+    } catch (err) {
+      notify(String(err?.message || 'That didn’t work. Check your internet connection and try again.'), true);
+      setRemoving(false);
+    }
+  };
+  const needsSignIn = bank.cloud && !bank.cloud.revoked && !cloud.user;
   const [tab, setTab] = useState('lessons');
   const [editing, setEditing] = useState(null);
   const editable = canEdit(bank, userId);
@@ -74,6 +112,16 @@ function BankDetail({ bank, onLink }) {
         <input className="title-input grow" value={bank.name} disabled={!editable} onChange={(e) => edit((b) => { b.name = e.target.value; })} />
         <input type="color" value={bank.color} disabled={!editable} onChange={(e) => edit((b) => { b.color = e.target.value; })} />
         <button className="primary" onClick={onLink}>Link into my class…</button>
+        {(isOwner || bank.cloud) && (
+          <button
+            className="danger"
+            disabled={removing || needsSignIn}
+            title={needsSignIn ? 'Sign in to change a bank that’s shared online' : undefined}
+            onClick={remove}
+          >
+            {isOwner ? 'Delete bank' : 'Leave bank'}
+          </button>
+        )}
       </div>
       <p className="small muted">
         Owner: {bank.cloud ? (bank.cloud.role === 'owner' ? 'you' : bank.cloud.ownerName) : state.users.find((u) => u.id === bank.ownerId)?.name}
@@ -103,7 +151,7 @@ function BankDetail({ bank, onLink }) {
                           <button className="icon-btn" disabled={i === bank.sequence.length - 1} onClick={() => update((d) => editSequence(d, bank.id, (s) => swap(s, i, i + 1)))}>↓</button>
                           <button className="icon-btn" title="Delete" onClick={() => {
                             if (usedIn.length && !window.confirm(`This lesson is linked into ${usedIn.join(', ')}. Delete it from the bank anyway? (Linked copies stay in those classes.)`)) return;
-                            update((d) => { editSequence(d, bank.id, (s) => pullBack(s, i)); pruneOrphans(d); });
+                            update((d) => { editSequence(d, bank.id, (s) => pullBack(s, i)); pruneOrphans(d); }, { separate: true });
                             notify('Lesson removed from bank', { undo: true });
                           }}>✕</button>
                         </>

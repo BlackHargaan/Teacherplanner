@@ -75,7 +75,7 @@ function Browse() {
       // Built-in samples are hidden rather than deleted, so they can come back.
       if (builtin) d.hiddenFrameworks = [...new Set([...(d.hiddenFrameworks || []), fw.id])];
       else d.frameworks = d.frameworks.filter((f) => f.id !== fw.id);
-    });
+    }, { separate: true });
     setFwId(frameworks.find((f) => f.id !== fw.id)?.id);
     notify(`Removed ${fw.name}`, { undo: true });
   };

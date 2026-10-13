@@ -90,7 +90,7 @@ export default function CalendarImport({ year, onClose }) {
       }
       counts = applyImport(y, rows, { replaceDaysOff: replaceDaysOff && existingOff > 0, setBounds, makeTerms: makeTerms && previewTerms.length > 0, earlyTypeId: hasEarly ? earlyTypeId : null, makeId: () => uid('term') });
       y.calendarSource = { url: source.url || null, fileName: source.fileName || null, importedAt: new Date().toISOString() };
-    });
+    }, { separate: true });
     const parts = [
       counts.off && `${counts.off} days off`,
       counts.early && `${counts.early} early release days`,

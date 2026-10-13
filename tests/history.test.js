@@ -42,3 +42,27 @@ describe('separate steps', () => {
     expect(h.past).toEqual(['A', 'B', 'C']);
   });
 });
+
+describe('changes from teammates', () => {
+  it('are applied to undo and redo steps so undo never rolls them back', async () => {
+    const { applyToHistory } = await import('../src/lib/history.js');
+    let h = createHistory();
+    const s0 = { lessons: { x: 'old' } };
+    const s1 = { lessons: { x: 'old' }, mine: 1 };
+    h = record(h, s0, 1000);
+    h = record(h, s1, 5000);
+    const current = { lessons: { x: 'old' }, mine: 2 };
+    const teammate = (d) => { d.lessons.x = 'teammate'; };
+    teammate(current);
+    applyToHistory(h, teammate);
+    const r = undo(h, current);
+    expect(r.state).toEqual({ lessons: { x: 'teammate' }, mine: 1 });
+    expect(undo(r.history, r.state).state.lessons.x).toBe('teammate');
+  });
+  it('skips steps the change does not fit', async () => {
+    const { applyToHistory } = await import('../src/lib/history.js');
+    const h = record(record(createHistory(), { banks: [] }, 1000), { banks: [{ id: 'b' }] }, 5000);
+    applyToHistory(h, (d) => { d.banks.find((b) => b.id === 'b').shared = true; });
+    expect(h.past).toEqual([{ banks: [] }, { banks: [{ id: 'b', shared: true }] }]);
+  });
+});

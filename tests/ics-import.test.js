@@ -205,3 +205,42 @@ describe('calendar links', () => {
       .rejects.toThrow(/Check your internet connection/);
   });
 });
+
+describe('review fixes', () => {
+  const weekly = (extra = '') => `BEGIN:VCALENDAR
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:20261202
+DTEND;VALUE=DATE:20261203
+RRULE:FREQ=WEEKLY;UNTIL=20261231;BYDAY=WE
+UID:er@example
+SUMMARY:Early Release
+END:VEVENT
+${extra}END:VCALENDAR`;
+  const override = (recurrence, start, status = '') => `BEGIN:VEVENT
+UID:er@example
+RECURRENCE-ID;VALUE=DATE:${recurrence}
+DTSTART;VALUE=DATE:${start}
+DTEND;VALUE=DATE:${start.slice(0, 6)}${String(Number(start.slice(6)) + 1).padStart(2, '0')}
+SUMMARY:Early Release
+${status}END:VEVENT
+`;
+  const dates = (ics) => importRows(parseICS(ics), '2026-12-01', '2026-12-31').map((r) => r.start);
+
+  it('a cancelled single occurrence of a repeating event is not imported', () => {
+    expect(dates(weekly(override('20261216', '20261216', 'STATUS:CANCELLED\n')))).toEqual(['2026-12-02', '2026-12-09', '2026-12-23', '2026-12-30']);
+  });
+
+  it('a moved single occurrence replaces the original date', () => {
+    expect(dates(weekly(override('20261216', '20261217')))).toEqual(['2026-12-02', '2026-12-09', '2026-12-17', '2026-12-23', '2026-12-30']);
+  });
+
+  it('early release never erases a day off already in the year', () => {
+    const year = {
+      start: '2026-08-24', end: '2027-06-04', weekdays: [1, 2, 3, 4, 5], scheduleType: 'weekly', dayAssignments: {},
+      nonSchoolDays: [{ start: '2026-12-16', label: 'Snow', kind: 'cancelled' }, { start: '2026-12-23', end: '2026-12-31', label: 'Winter Break' }],
+    };
+    applyImport(year, importRows(parseICS(weekly()), '2026-12-01', '2026-12-31'), { earlyTypeId: 'early' });
+    expect(year.nonSchoolDays.map((r) => r.label)).toEqual(['Snow', 'Winter Break']);
+    expect(Object.keys(year.dayAssignments).sort()).toEqual(['2026-12-02', '2026-12-09']);
+  });
+});

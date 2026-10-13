@@ -56,17 +56,29 @@ export async function acceptInvites() {
   return check(await (await supabase()).rpc('accept_invites'));
 }
 
+// The server returns at most 1000 rows per request; anything past that would
+// look "deleted online". Read every table in pages, in a fixed order.
+const PAGE = 1000;
+export async function fetchAll(makeQuery, pageSize = PAGE) {
+  const rows = [];
+  for (let from = 0; ; from += pageSize) {
+    const page = check(await makeQuery().range(from, from + pageSize - 1));
+    rows.push(...page);
+    if (page.length < pageSize) return rows;
+  }
+}
+
 /** Everything this teacher can see (row-level security does the filtering). */
 export async function fetchSnapshot(userId) {
   const db = await supabase();
   const [banks, lessons, members, profiles, invites] = await Promise.all([
-    db.from('banks').select('*'),
-    db.from('bank_lessons').select('id, bank_id, data, updated_at'),
-    db.from('bank_members').select('bank_id, user_id, role'),
-    db.from('profiles').select('id, email, display_name'),
-    db.from('bank_invites').select('bank_id, email, role'),
+    fetchAll(() => db.from('banks').select('*').order('id')),
+    fetchAll(() => db.from('bank_lessons').select('id, bank_id, data, updated_at').order('bank_id').order('id')),
+    fetchAll(() => db.from('bank_members').select('bank_id, user_id, role').order('bank_id').order('user_id')),
+    fetchAll(() => db.from('profiles').select('id, email, display_name').order('id')),
+    fetchAll(() => db.from('bank_invites').select('bank_id, email, role').order('bank_id').order('email')),
   ]);
-  return { userId, banks: check(banks), lessons: check(lessons), members: check(members), profiles: check(profiles), invites: check(invites) };
+  return { userId, banks, lessons, members, profiles, invites };
 }
 
 /** Upload { banks, lessons, deletes } from changesToPush(). */

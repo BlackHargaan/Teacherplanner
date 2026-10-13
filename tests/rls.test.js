@@ -74,6 +74,18 @@ describe('team lesson banks — row-level security', () => {
     expect((await as(ANA, 'select name from banks'))[0].name).toBe('Grade 7 Science');
   });
 
+  it('accepts the statements the app sends to share a bank (upsert, insert … returning)', async () => {
+    await as(DAN, "insert into banks (id, name) values ('bank-d', 'Dan’s bank') on conflict (id) do update set name = excluded.name");
+    await as(DAN, "insert into banks (id, name) values ('bank-d', 'Renamed') on conflict (id) do update set name = excluded.name");
+    expect(await as(DAN, "insert into banks (id, name) values ('bank-d2', 'Two') returning id")).toEqual([{ id: 'bank-d2' }]);
+    expect((await as(DAN, "select name from banks where id = 'bank-d'"))[0].name).toBe('Renamed');
+    await as(DAN, "insert into bank_lessons (id, bank_id, data) values ('dl', 'bank-d', '{}') on conflict (bank_id, id) do update set data = excluded.data");
+    // …but an upsert can't take over someone else's bank id
+    expect(await fails(as(BEN, "insert into banks (id, name) values ('bank-d', 'Mine now') on conflict (id) do update set name = excluded.name"))).toBe(true);
+    expect((await as(DAN, "select name from banks where id = 'bank-d'"))[0].name).toBe('Renamed');
+    await as(DAN, "delete from banks where id in ('bank-d', 'bank-d2')");
+  });
+
   it('does not let anyone create a bank in someone else’s name', async () => {
     expect(await fails(as(BEN, `insert into banks (id, owner_id) values ('bank-x', '${ANA}')`))).toBe(true);
   });
@@ -81,7 +93,10 @@ describe('team lesson banks — row-level security', () => {
   it('lets only the owner invite, and viewers only read', async () => {
     expect(await fails(as(BEN, "select invite_to_bank('bank-1', 'ben@school.org', 'edit')"))).toBe(true);
     expect(await fails(as(null, "select invite_to_bank('bank-1', 'dan@school.org', 'view')"))).toBe(true);
-    expect((await as(ANA, "select invite_to_bank('bank-1', 'Ben@School.org ', 'view') as r"))[0].r).toBe('added');
+    // The answer never reveals whether the email has an account.
+    expect((await as(ANA, "select invite_to_bank('bank-1', 'Ben@School.org ', 'view') as r"))[0].r).toBe('invited');
+    expect(await as(BEN, 'select name from banks')).toEqual([]); // not in until Ben's planner accepts
+    expect((await as(BEN, 'select accept_invites() as n'))[0].n).toBe(1);
     expect((await as(BEN, 'select name from banks')).map((r) => r.name)).toEqual(['Grade 7 Science']);
     expect((await as(BEN, 'select id from bank_lessons')).map((r) => r.id)).toEqual(['l1']);
     // viewers can't change anything
@@ -93,7 +108,7 @@ describe('team lesson banks — row-level security', () => {
   });
 
   it('lets editors change lessons but not membership, ownership or the bank’s existence', async () => {
-    await as(ANA, "select invite_to_bank('bank-1', 'ben@school.org', 'edit')");
+    expect((await as(ANA, "select invite_to_bank('bank-1', 'ben@school.org', 'edit') as r"))[0].r).toBe('updated');
     await as(BEN, `update bank_lessons set data = '{"title":"Cells (edited)"}' where id = 'l1'`);
     expect((await as(ANA, "select data->>'title' as t, updated_by from bank_lessons"))[0]).toEqual({ t: 'Cells (edited)', updated_by: BEN });
     await as(BEN, `insert into bank_lessons (id, bank_id, data) values ('l2', 'bank-1', '{"title":"Mitosis"}')`);
@@ -154,7 +169,9 @@ describe('school profiles — row-level security', () => {
   const schoolOf = (id) => as(id, 'select id, name, join_code, data from schools');
 
   it('keeps a school private until someone joins with its code', async () => {
-    await as(DAN, `insert into schools (id, name, join_code, data) values ('school-1', 'Greene Intermediate', '${CODE}', '{"start":"2026-08-24"}')`);
+    // exactly what the app sends (insert … returning), which checks the read rule against the new row
+    const [made] = await as(DAN, `insert into schools (id, name, join_code, data) values ('school-1', 'Greene Intermediate', '${CODE}', '{"start":"2026-08-24"}') returning id, owner_id, name, join_code, updated_at`);
+    expect(made).toMatchObject({ id: 'school-1', owner_id: DAN, join_code: CODE });
     expect((await schoolOf(DAN)).map((r) => r.name)).toEqual(['Greene Intermediate']);
     expect(await schoolOf(BEN)).toEqual([]);
     expect(await as(null, 'select * from schools')).toEqual([]);

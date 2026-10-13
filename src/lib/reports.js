@@ -26,6 +26,27 @@ export function standardsCoverage(state, calendar, classes, start, end) {
   return out;
 }
 
+/**
+ * A gradebook cell as a number, or null when it holds no score: blank or
+ * spaces, or a note such as "ABS" or "EX". Use this anywhere scores are added up.
+ */
+export function parseScore(v) {
+  if (v == null) return null;
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  const s = String(v).trim();
+  if (!s) return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Class average for one assignment as a percent, or null when nobody has a score. */
+export function assignmentAverage(gradebook, assignment, studentIds) {
+  const vals = studentIds.map((id) => parseScore(gradebook.scores?.[assignment.id]?.[id])).filter((v) => v != null);
+  const points = Number(assignment.points) || 0;
+  if (!vals.length || !points) return null;
+  return (vals.reduce((x, y) => x + y, 0) / vals.length / points) * 100;
+}
+
 /** Latest standard score per student, plus the class average, for a date range. */
 export function achievement(cls, standardId, start, end) {
   const latest = {};
@@ -33,7 +54,7 @@ export function achievement(cls, standardId, start, end) {
     if (s.standardId !== standardId || s.date < start || s.date > end) continue;
     if (!latest[s.studentId] || latest[s.studentId].date <= s.date) latest[s.studentId] = s;
   }
-  const scores = Object.values(latest).map((s) => Number(s.score));
+  const scores = Object.values(latest).map((s) => parseScore(s.score)).filter((v) => v != null);
   const avg = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
   return { latest, avg };
 }
@@ -42,10 +63,10 @@ export function achievement(cls, standardId, start, end) {
 export function studentAverage(gradebook, studentId) {
   const byCat = {};
   for (const a of gradebook.assignments) {
-    const v = gradebook.scores?.[a.id]?.[studentId];
-    if (v === '' || v == null || Number.isNaN(Number(v))) continue;
+    const v = parseScore(gradebook.scores?.[a.id]?.[studentId]);
+    if (v == null) continue;
     const c = byCat[a.categoryId] || (byCat[a.categoryId] = { earned: 0, possible: 0 });
-    c.earned += Number(v);
+    c.earned += v;
     c.possible += Number(a.points) || 0;
   }
   let total = 0;

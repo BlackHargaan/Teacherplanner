@@ -84,7 +84,7 @@ export default function Seating() {
         </div>
       </div>
       {editable && (
-        <div className="card row wrap no-print">
+        <div className="card row wrap no-print" data-tour="seat-layout">
           <Field label="Name" inline><input value={chart.name} onChange={(e) => editChart((c) => { c.name = e.target.value; })} /></Field>
           <Field label="Rows" inline><input type="number" className="mini" min="1" max="15" value={chart.rows} onChange={(e) => { const n = gridSize(e.target.value); if (n) editChart((c) => { c.rows = n; }); }} onBlur={unseatOutside} /></Field>
           <Field label="Columns" inline><input type="number" className="mini" min="1" max="15" value={chart.cols} onChange={(e) => { const n = gridSize(e.target.value); if (n) editChart((c) => { c.cols = n; }); }} onBlur={unseatOutside} /></Field>

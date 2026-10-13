@@ -92,6 +92,11 @@ The first launch can load sample data (three classes, a colleague's shared lesso
 
 Lessons are stored as an ordered sequence per class: lesson *n* is taught at the class's *n*-th meeting. Add a snow day, remove a class or add an extra one, and every later lesson shifts automatically.
 
+### Guided tours
+- On first launch a **getting-started tour** walks through the app one highlighted spot at a time (Back / Next / Skip, arrow keys, Esc).
+- The first time a teacher opens a page, a small card offers that **page's tour**. Each page has one, and all are in the **?** menu at the top, the desktop app's **Help → Getting Started Tour**, and **Settings → Tours and tips** (where page offers can be turned off or reset).
+- Tour text and steps live in `src/lib/tours.js`; anchors are CSS selectors or `data-tour` attributes on the page.
+
 ### Search, undo and printable plans
 - **Search** (top bar, or <kbd>Ctrl</kbd>+<kbd>K</kbd>, <kbd>/</kbd>, or Edit → Find Lessons) looks through every lesson in every school year: titles, section text, standards, strategies, attachments and your private notes. Each result links to the days the lesson is taught.
 - **Undo / redo** for any change (<kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>, the Edit menu, or the **Undo** button on the confirmation message). Quick successive edits, like typing, count as one step.

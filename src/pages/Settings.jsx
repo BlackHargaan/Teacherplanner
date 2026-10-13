@@ -8,9 +8,12 @@ import { Field, Modal, download } from '../components/ui.jsx';
 import { formatDate } from '../lib/dates.js';
 import { today } from '../lib/dates.js';
 import { MODES, PALETTES } from '../data/themes.js';
+import { useTour } from '../components/Tour.jsx';
+import { resetPageTours, setTips } from '../lib/tours.js';
 
 export default function Settings() {
-  const { state, update, replace, notify, userId, vault, openVault } = useStore();
+  const { state, update, applyRemote, replace, notify, userId, vault, openVault } = useStore();
+  const tour = useTour();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const me = state.users.find((u) => u.id === userId);
@@ -45,7 +48,7 @@ export default function Settings() {
     <div className="page">
       <div className="page-head"><h1>Settings</h1></div>
       <div className="cards">
-        <section className="card wide">
+        <section data-tour="appearance" className="card wide">
           <h2>Appearance</h2>
           <div className="palette-grid">
             {PALETTES.map((p) => (
@@ -69,6 +72,19 @@ export default function Settings() {
             </div>
           </div>
           <p className="small muted">Your colors are saved with your profile. Class and lesson-section colors are set on the Classes page.</p>
+        </section>
+
+        <section className="card" id="tours">
+          <h2>Tours and tips</h2>
+          <p className="small muted">Short guided tours point out what’s on each screen. They’re also in the ? menu at the top.</p>
+          <div className="row wrap">
+            <button className="primary" onClick={() => tour.start('start')}>Start the getting-started tour</button>
+          </div>
+          <label className="row small">
+            <input type="checkbox" checked={me.tutorial?.tips !== false} onChange={(e) => applyRemote((d) => setTips(d.users.find((u) => u.id === userId), e.target.checked))} />
+            Offer a quick tour the first time I open each page
+          </label>
+          <button className="link-btn small" onClick={() => { applyRemote((d) => resetPageTours(d.users.find((u) => u.id === userId))); notify('Each page will offer its tour again.'); }}>Offer every page’s tour again</button>
         </section>
 
         <section className="card">
@@ -109,7 +125,7 @@ export default function Settings() {
         <AccountCard />
         <UpdatesCard />
 
-        <section className="card">
+        <section data-tour="statuses" className="card">
           <h2>Lesson status tags</h2>
           {state.statuses.map((s, i) => (
             <div key={s.id} className="row">
@@ -130,7 +146,7 @@ export default function Settings() {
           <button onClick={() => update((d) => { d.statuses.push({ id: uid('st'), name: 'New status', color: '#0ea5e9' }); })}>+ Status</button>
         </section>
 
-        <section className="card">
+        <section data-tour="data" className="card">
           <h2>Data</h2>
           {host && vault?.vaultPath ? (
             <>

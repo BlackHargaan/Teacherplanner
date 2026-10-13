@@ -49,7 +49,7 @@ export default function Gradebook() {
         </div>
       </div>
 
-      <details className="card">
+      <details className="card" data-tour="categories">
         <summary>Categories & weights</summary>
         <table className="table compact">
           <tbody>
@@ -70,7 +70,7 @@ export default function Gradebook() {
       </details>
 
       {students.length === 0 ? <Empty>Add students on the <a href="#/classes">Classes → Roster</a> tab.</Empty> : (
-        <div className="scroll-x card">
+        <div className="scroll-x card" data-tour="grades">
           <table className="table grade-table">
             <thead>
               <tr>

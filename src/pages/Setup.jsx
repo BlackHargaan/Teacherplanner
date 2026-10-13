@@ -44,7 +44,7 @@ export default function Setup() {
       <div className="cards">
         <SchoolProfile year={year} />
 
-        <section className="card">
+        <section data-tour="calendar" className="card">
           <h2>Calendar</h2>
           <Field label="Name"><input value={year.name} onChange={(e) => setYear({ name: e.target.value })} /></Field>
           <fieldset className="plain-fieldset" disabled={readOnly}>
@@ -95,7 +95,7 @@ export default function Setup() {
 
           <GradingPeriods year={year} editYear={editYear} readOnly={readOnly} />
 
-          <section className="card wide">
+          <section data-tour="year-calendar" className="card wide">
             <div className="row wrap">
               <h2 className="grow">Year calendar</h2>
               {!readOnly && <button onClick={() => setImporting(true)}>{year.calendarSource ? 'Update from district calendar…' : 'Import district calendar…'}</button>}
@@ -108,19 +108,19 @@ export default function Setup() {
             <fieldset className="plain-fieldset" disabled={readOnly}><NonSchoolDays year={year} editYear={editYear} /></fieldset>
           </section>
 
-          <section className="card wide">
+          <section data-tour="bells" className="card wide">
             <h2>Bell schedule</h2>
             <p className="small muted">Enter your school’s periods once, then put each class in its period.</p>
             <BellSchedule year={year} readOnly={readOnly} />
           </section>
 
-          <section className="card wide">
+          <section data-tour="alt-days" className="card wide">
             <h2>Alternate day schedules</h2>
             <p className="small muted">Define special days — half days, assemblies, planning days — with their own class times. Assign them to dates here or from the day menu in the planner.</p>
             <DayTypes year={year} editYear={editYear} classes={classes} readOnly={readOnly} />
           </section>
 
-          <section className="card wide">
+          <section data-tour="daily" className="card wide">
             <h2>Daily changes</h2>
             <p className="small muted">Extra classes and classes removed from individual days (managed from the planner).</p>
             {(year.overrides || []).length === 0 ? <Empty>None yet.</Empty> : (
@@ -180,7 +180,7 @@ export default function Setup() {
     };
     const edit = (id, patch) => editYear((y) => Object.assign(y.gradingPeriods.find((g) => g.id === id), patch));
     return (
-      <section className="card">
+      <section data-tour="grading" className="card">
         <h2>Grading periods</h2>
         <fieldset className="plain-fieldset" disabled={readOnly}>
         <div className="row wrap">

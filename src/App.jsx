@@ -21,6 +21,9 @@ import Settings from './pages/Settings.jsx';
 import Search from './pages/Search.jsx';
 import PrintPage from './pages/Print.jsx';
 import { navigate } from './lib/router.js';
+import { useTour } from './components/Tour.jsx';
+import { Menu } from './components/ui.jsx';
+import { TOURS } from './lib/tours.js';
 
 const PAGES = [
   ['planner', 'Planner', Planner],
@@ -45,6 +48,7 @@ function editingText() {
 export default function App() {
   const { state, update, undo, redo, notify, toast, year, loadError } = useStore();
   const [route, param] = useHashRoute();
+  const tour = useTour();
   const [menuOpen, setMenuOpen] = useState(false);
   useEffect(() => setMenuOpen(false), [route, param]); // close the menu after picking a page
   useEffect(() => {
@@ -62,6 +66,7 @@ export default function App() {
   // in a browser we listen for the keys directly.
   useEffect(() => {
     const run = (cmd) => {
+      if (cmd === 'tour') { tour.start('start'); return; }
       if (cmd === 'find') {
         const box = document.getElementById('global-search');
         if (box) { box.focus(); box.select(); } else navigate('search');
@@ -83,7 +88,7 @@ export default function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => { offMenu?.(); window.removeEventListener('keydown', onKey); };
-  }, [undo, redo, notify]);
+  }, [undo, redo, notify, tour.start]);
 
   if (host && loadError) return <><LoadError /><Toast toast={toast} /></>;
   if (host && !state) return <><Welcome /><Toast toast={toast} /></>;
@@ -111,6 +116,17 @@ export default function App() {
         </nav>
         <SearchBox initial={route === 'search' ? decodeURIComponent(param || '') : ''} />
         <CloudStatus />
+        <Menu
+          className="help-menu"
+          label="?"
+          title="Help and tours"
+          items={[
+            tour.pageTour && { label: `Tour this page (${TOURS[tour.pageTour].title})`, onClick: () => tour.start(tour.pageTour) },
+            { label: 'Getting started tour', onClick: () => tour.start('start') },
+            '-',
+            { label: 'Tour settings…', onClick: () => navigate('settings/tours') },
+          ]}
+        />
         <div className="who">
           <select value={state.currentYearId} onChange={(e) => update((d) => { d.currentYearId = e.target.value; })} aria-label="School year">
             {state.years.map((y) => <option key={y.id} value={y.id}>{y.name}</option>)}

@@ -452,3 +452,33 @@ fieldset.subcard { min-width: 0; margin: 0; }
 .join-code code { font-size: 1.15em; letter-spacing: 0.08em; }
 .school-members { margin: 4px 0; }
 .school-members summary { cursor: pointer; }
+
+/* Guided tours */
+.tour-layer { position: fixed; inset: 0; z-index: 200; }
+.tour-blocker { position: fixed; inset: 0; }
+.tour-blocker.tour-dim { background: rgba(15, 23, 42, 0.55); }
+.tour-spot {
+  position: fixed; border-radius: 10px; pointer-events: none;
+  box-shadow: 0 0 0 3px var(--accent), 0 0 0 9999px rgba(15, 23, 42, 0.55);
+  transition: top 0.25s ease, left 0.25s ease, width 0.25s ease, height 0.25s ease;
+}
+.tour-box {
+  position: fixed; width: min(360px, calc(100vw - 24px)); background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-radius: 12px; padding: 1rem 1.1rem 0.9rem;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35); display: flex; flex-direction: column; gap: 0.4rem;
+}
+.tour-box.tour-welcome { width: min(440px, calc(100vw - 24px)); }
+.tour-box h2 { margin: 0; font-size: 1.1rem; padding-right: 1.6rem; }
+.tour-box p { margin: 0; line-height: 1.5; }
+.tour-close { position: absolute; top: 0.5rem; right: 0.5rem; }
+.tour-dots { display: flex; gap: 5px; margin-top: 0.3rem; }
+.tour-dots span { width: 6px; height: 6px; border-radius: 50%; background: var(--border); }
+.tour-dots span.on { background: var(--accent); }
+.tour-actions { margin-top: 0.3rem; align-items: center; }
+.tour-offer {
+  position: fixed; right: 1rem; bottom: 1rem; z-index: 90; max-width: min(380px, calc(100vw - 2rem));
+  background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25); padding: 0.8rem 1rem; display: flex; flex-direction: column; gap: 0.6rem;
+}
+.help-menu > .icon-btn { font-weight: 700; border: 1px solid var(--border); border-radius: 50%; width: 2rem; height: 2rem; }
+@media (prefers-reduced-motion: reduce) { .tour-spot { transition: none; } }

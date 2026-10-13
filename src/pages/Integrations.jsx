@@ -41,7 +41,7 @@ export default function Integrations() {
     <div className="page">
       <div className="page-head"><h1>Google Integration</h1></div>
       <div className="cards">
-        <section className="card wide">
+        <section data-tour="gcal" className="card wide">
           <h2>Google Calendar</h2>
           <p className="small">Export your class schedule with lesson titles and details as an <code>.ics</code> file, then in Google Calendar choose <em>Settings → Import &amp; export → Import</em>. Re-export after big schedule changes (events keep stable IDs, so re-importing updates them).</p>
           <div className="chips">
@@ -67,7 +67,7 @@ export default function Integrations() {
           </ul>
         </section>
 
-        <section className="card">
+        <section data-tour="classroom" className="card">
           <h2>Google Classroom</h2>
           <p className="small">Post this week’s lesson links and attachments to Classroom as an assignment, material or announcement with one click.</p>
           <ul className="list">
@@ -84,7 +84,7 @@ export default function Integrations() {
           </ul>
         </section>
 
-        <section className="card">
+        <section data-tour="drive" className="card">
           <h2>Google Drive</h2>
           <p className="small">Attach Drive files to lessons with the <strong>Google Drive</strong> attachment type — paste the file’s share link. Large files (over 1.5&nbsp;MB) should always live in Drive rather than in the planner.</p>
           <p className="small">To keep a copy of your plans in Drive, use <a href="#/views">Shared Views → Download page</a> or <a href="#/settings">Settings → Export backup</a> and upload the file.</p>

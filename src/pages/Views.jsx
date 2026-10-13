@@ -104,7 +104,7 @@ export default function Views() {
                 <label key={k} className="row small"><input type="checkbox" checked={!!view[k]} onChange={(e) => edit((v) => { v[k] = e.target.checked; })} /> {l}</label>
               ))}
             </div>
-            <div className="row wrap">
+            <div className="row wrap" data-tour="view-open">
               <a className="btn primary" href={`#/view/${view.id}`} target="_blank" rel="noreferrer">Open view</a>
               <SnapshotButton view={view} />
               <button className="danger" onClick={() => { update((d) => { d.views = d.views.filter((v) => v.id !== view.id); }); setSelected(null); notify('View deleted', { undo: true }); }}>Delete</button>

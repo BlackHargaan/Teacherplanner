@@ -133,17 +133,7 @@ export default function Settings() {
               <p className="small muted">Saved automatically as you work, with a daily backup in its <code>backups</code> folder. Keep this folder in OneDrive, Google Drive or Dropbox to use the planner on more than one computer (one computer at a time).</p>
               <div className="row wrap">
                 <button onClick={() => host.openPath()}>Open folder</button>
-                <button onClick={async () => {
-                  const info = await host.chooseFolder('pick');
-                  if (!info) return;
-                  if (info.hasData) {
-                    if (!window.confirm('That folder already has a planner. Switch to it? (Your current folder is left untouched.)')) return;
-                  } else {
-                    await host.save(JSON.stringify(state, null, 1));
-                  }
-                  await openVault(info);
-                  notify(info.hasData ? 'Opened planner folder' : 'Planner moved to the new folder');
-                }}>Move / switch folder…</button>
+                <button onClick={() => moveOrSwitchFolder(state, openVault, notify)}>Move / switch folder…</button>
                 <button onClick={() => setRestoring(true)}>Restore an earlier version…</button>
               </div>
             </>
@@ -165,8 +155,41 @@ export default function Settings() {
   );
 }
 
-/** Pick a daily backup (or a pre-restore safety copy) and bring it back. */
-function RestoreDialog({ onClose }) {
+/**
+ * Desktop: pick another folder. If it already has a planner, switch to it
+ * only after the teacher agrees; otherwise move this planner (and its
+ * attachments) there.
+ */
+async function moveOrSwitchFolder(state, openVault, notify) {
+  try {
+    const choice = await host.chooseFolder('pick');
+    if (!choice) return;
+    if (choice.hasData) {
+      if (!window.confirm('That folder already has a planner. Switch to it? (Your current folder is left untouched.)')) return;
+      await openVault(await host.useFolder(choice.path));
+      notify('Opened planner folder');
+      return;
+    }
+    const info = await host.useFolder(choice.path, { move: true });
+    await host.save(JSON.stringify(state, null, 1));
+    await openVault(info);
+    const failed = info.attachments?.failed || [];
+    if (failed.length) {
+      notify(`Planner moved, but ${failed.length === 1 ? '1 attachment' : `${failed.length} attachments`} couldn’t be copied: ${failed.slice(0, 5).join(', ')}${failed.length > 5 ? '…' : ''}. They are still in the old folder’s attachments folder.`, true);
+    } else {
+      notify('Planner moved to the new folder');
+    }
+  } catch {
+    notify('That folder couldn’t be used. Check that you can save files there.', true);
+  }
+}
+
+/**
+ * Pick a daily backup (or a pre-restore safety copy) and bring it back.
+ * `damaged`: planner.json couldn't be read, so it's set aside (renamed) rather
+ * than copied into the backups.
+ */
+export function RestoreDialog({ onClose, damaged = false }) {
   const { replace, notify } = useStore();
   const [backups, setBackups] = useState(null);
   const [busy, setBusy] = useState(null);
@@ -174,14 +197,18 @@ function RestoreDialog({ onClose }) {
 
   const restore = async (b) => {
     const when = formatDate(b.date, { weekday: 'long', month: 'long', day: 'numeric' });
-    if (!window.confirm(`Replace your planner with the version from ${when}? Your current planner is kept as a backup, and you can also undo right after.`)) return;
+    const ask = damaged
+      ? `Bring back your planner from ${when}? The file that couldn’t be read stays in your planner folder, renamed.`
+      : `Replace your planner with the version from ${when}? Your current planner is kept as a backup, and you can also undo right after.`;
+    if (!window.confirm(ask)) return;
     setBusy(b.file);
     try {
       const data = JSON.parse(await host.readBackup(b.file));
       if (!data.years || !data.classes || !data.lessons) throw new Error('not a planner');
-      await host.snapshotBeforeRestore();
+      if (damaged) await host.setAsideDamaged();
+      else await host.snapshotBeforeRestore();
       replace(data);
-      notify(`Restored your planner from ${when}.`, { undo: true });
+      notify(`Restored your planner from ${when}.`, damaged ? undefined : { undo: true });
       onClose();
     } catch {
       notify('That backup could not be read.', true);

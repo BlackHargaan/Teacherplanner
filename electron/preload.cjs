@@ -3,7 +3,11 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('plannerHost', {
   info: () => ipcRenderer.invoke('vault:info'),
+  // Ask for a folder ({ path, hasData }); nothing changes until useFolder().
   chooseFolder: (mode) => ipcRenderer.invoke('vault:choose', mode),
+  // Switch to the chosen folder. { move: true } also copies attachments/ there.
+  useFolder: (dir, opts) => ipcRenderer.invoke('vault:use', dir, opts),
+  setAsideDamaged: () => ipcRenderer.invoke('vault:set-aside-damaged'),
   load: () => ipcRenderer.invoke('vault:load'),
   save: (json) => ipcRenderer.invoke('vault:save', json),
   saveSync: (json) => ipcRenderer.sendSync('vault:save-sync', json),
@@ -42,3 +46,9 @@ contextBridge.exposeInMainWorld('plannerHost', {
     return () => ipcRenderer.removeListener('vault:changed', listener);
   },
 });
+
+// A file dropped anywhere the page doesn't handle it would otherwise replace
+// the planner with that file. In-app drag and drop (no files) is untouched.
+const hasFiles = (e) => Array.from(e.dataTransfer?.types || []).includes('Files');
+window.addEventListener('dragover', (e) => { if (hasFiles(e)) e.preventDefault(); });
+window.addEventListener('drop', (e) => { if (hasFiles(e)) e.preventDefault(); });

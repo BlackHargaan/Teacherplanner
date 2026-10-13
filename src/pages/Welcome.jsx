@@ -1,6 +1,17 @@
 import { useState } from 'react';
 import { host, useStore, resetToDemo, resetToEmpty } from '../lib/store.jsx';
 
+/**
+ * Pick a folder and open it. Nothing here is saved yet, so a folder that
+ * already has a planner is simply opened.
+ */
+export async function chooseFolder(mode, openVault) {
+  const choice = await host.chooseFolder(mode);
+  if (!choice) return false;
+  await openVault(await host.useFolder(choice.path));
+  return true;
+}
+
 /** First run of the desktop app: pick the planner folder, then how to start. */
 export default function Welcome() {
   const { vault, openVault, replace, notify } = useStore();
@@ -11,8 +22,9 @@ export default function Welcome() {
   const choose = async (mode) => {
     setBusy(true);
     try {
-      const info = await host.chooseFolder(mode);
-      if (info) await openVault(info);
+      await chooseFolder(mode, openVault);
+    } catch {
+      notify('That folder couldn’t be used. Check that you can save files there.', true);
     } finally {
       setBusy(false);
     }

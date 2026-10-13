@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { host, useStore } from './lib/store.jsx';
 import { applyAppearance } from './data/themes.js';
 import Welcome from './pages/Welcome.jsx';
+import LoadError from './pages/LoadError.jsx';
 import { UpdateBanner } from './components/Updates.jsx';
 import { CloudStatus } from './components/CloudAccount.jsx';
 import { useHashRoute } from './lib/router.js';
@@ -42,7 +43,7 @@ function editingText() {
 }
 
 export default function App() {
-  const { state, update, undo, redo, notify, toast, year } = useStore();
+  const { state, update, undo, redo, notify, toast, year, loadError } = useStore();
   const [route, param] = useHashRoute();
   const [menuOpen, setMenuOpen] = useState(false);
   useEffect(() => setMenuOpen(false), [route, param]); // close the menu after picking a page
@@ -84,6 +85,7 @@ export default function App() {
     return () => { offMenu?.(); window.removeEventListener('keydown', onKey); };
   }, [undo, redo, notify]);
 
+  if (host && loadError) return <><LoadError /><Toast toast={toast} /></>;
   if (host && !state) return <><Welcome /><Toast toast={toast} /></>;
   if (route === 'view') return <>{<Viewer id={param} />}<Toast toast={toast} /></>;
   if (route === 'print') return <><PrintPage /><Toast toast={toast} /></>;

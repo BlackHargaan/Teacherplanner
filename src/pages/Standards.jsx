@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from 'react';
 import { useStore } from '../lib/store.jsx';
 import { allFrameworks, canEdit, canView, isBuiltinFramework, uid, yearClasses } from '../lib/model.js';
-import { parseCSV, toCSV } from '../lib/csv.js';
+import { parseCSV, toCSVFile } from '../lib/csv.js';
 import { achievement, standardsCoverage } from '../lib/reports.js';
 import { formatDate, today } from '../lib/dates.js';
 import { ACCOMMODATIONS, DIFFERENTIATION, STRATEGIES } from '../data/presets.js';
@@ -135,7 +135,7 @@ function Browse() {
               Show {hiddenCount} removed sample {hiddenCount === 1 ? 'framework' : 'frameworks'}
             </button>
           )}
-          <button className="link-btn small" onClick={() => download('standards-template.csv', toCSV([['framework', 'subject', 'code', 'grade', 'description'], ['My District Science', 'Science', 'SCI.6.1', '6', 'Describe…']]), 'text/csv')}>CSV template</button>
+          <button className="link-btn small" onClick={() => download('standards-template.csv', toCSVFile([['framework', 'subject', 'code', 'grade', 'description'], ['My District Science', 'Science', 'SCI.6.1', '6', 'Describe…']]), 'text/csv;charset=utf-8')}>CSV template</button>
         </div>
       </aside>
       <section className="detail">
@@ -221,13 +221,13 @@ function Coverage() {
   const rows = (fw?.standards || []).filter((s) => !onlyMissing || !cov[s.id]);
   const covered = (fw?.standards || []).filter((s) => cov[s.id]).length;
 
-  const exportCsv = () => download('standards-coverage.csv', toCSV([
+  const exportCsv = () => download('standards-coverage.csv', toCSVFile([
     ['Code', 'Description', 'Times taught', 'First', 'Last', 'Classes'],
     ...rows.map((s) => {
       const c = cov[s.id];
       return [s.code, s.description, c?.count || 0, c?.dates[0] || '', c?.dates.at(-1) || '', c ? [...c.classIds].map((id) => visible.find((x) => x.id === id)?.name).join('; ') : ''];
     }),
-  ]), 'text/csv');
+  ]), 'text/csv;charset=utf-8');
 
   return (
     <div className="card">

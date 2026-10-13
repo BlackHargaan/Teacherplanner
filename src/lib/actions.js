@@ -77,3 +77,33 @@ export function deleteBankLocally(d, bankId, userId) {
   releaseBankLessons(d, bankId, userId);
   d.banks = d.banks.filter((b) => b.id !== bankId);
 }
+
+/**
+ * Lessons whose home class is going away but that another class (or bank)
+ * still uses through "Link into another class…" move there, with their
+ * section content re-keyed to the new home's sections so nothing disappears.
+ */
+export function releaseClassLessons(d, classId) {
+  const deleted = d.classes.find((c) => c.id === classId);
+  for (const lesson of Object.values(d.lessons)) {
+    if (lesson.homeType !== 'class' || lesson.homeId !== classId) continue;
+    const uses = (c) => c.id !== classId && (c.sequence || []).includes(lesson.id);
+    const cls = d.classes.find(uses);
+    const bank = cls ? null : d.banks.find(uses);
+    const home = cls || bank;
+    if (!home) continue; // pruned below
+    if (deleted) lesson.content = remapContent(lesson.content || {}, deleted.sections || [], home.sections || []);
+    Object.assign(lesson, { homeType: cls ? 'class' : 'bank', homeId: home.id, updatedAt: Date.now() });
+  }
+}
+
+/** Delete a class with its meeting times; keeps lessons other classes link to. */
+export function deleteClassLocally(d, classId) {
+  releaseClassLessons(d, classId);
+  d.classes = d.classes.filter((c) => c.id !== classId);
+  for (const y of d.years) {
+    y.overrides = (y.overrides || []).filter((o) => o.classId !== classId);
+    for (const t of y.dayTypes || []) t.slots = t.slots.filter((s) => s.classId !== classId);
+  }
+  pruneOrphans(d);
+}

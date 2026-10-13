@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { studentAverage, achievement, standardsCoverage } from '../src/lib/reports.js';
+import { assignmentAverage, parseScore, studentAverage, achievement, standardsCoverage } from '../src/lib/reports.js';
 
 describe('studentAverage', () => {
   it('weights categories and skips blanks', () => {
@@ -41,5 +41,31 @@ describe('standardsCoverage', () => {
     const cov = standardsCoverage(state, calendar, [cls], '2026-01-06', '2026-01-31');
     expect(cov.S1.count).toBe(1);
     expect(cov.T1.count).toBe(1);
+  });
+});
+
+describe('scores that are notes or blank', () => {
+  it('parseScore reads numbers and ignores blanks and notes', () => {
+    expect(parseScore(8)).toBe(8);
+    expect(parseScore(' 7.5 ')).toBe(7.5);
+    expect(parseScore('0')).toBe(0);
+    for (const v of ['', ' ', 'ABS', 'EX', 'abs', null, undefined, NaN]) expect(parseScore(v)).toBeNull();
+  });
+
+  const gb = {
+    categories: [{ id: 'hw', weight: 100 }],
+    assignments: [{ id: 'a', categoryId: 'hw', points: 10 }],
+    scores: { a: { s1: '8', s2: 'ABS', s3: ' ', s4: 'EX', s5: 6 } },
+  };
+
+  it('class average skips ABS / EX / blank instead of showing NaN or counting 0', () => {
+    expect(assignmentAverage(gb, gb.assignments[0], ['s1', 's2', 's3', 's4', 's5'])).toBeCloseTo(70);
+    expect(assignmentAverage(gb, gb.assignments[0], ['s2', 's3'])).toBeNull();
+  });
+
+  it('student average ignores a space or note rather than counting it as 0', () => {
+    expect(studentAverage(gb, 's3')).toBeNull();
+    expect(studentAverage(gb, 's2')).toBeNull();
+    expect(studentAverage(gb, 's1')).toBeCloseTo(80);
   });
 });

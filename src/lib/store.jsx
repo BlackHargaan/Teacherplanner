@@ -32,6 +32,8 @@ export function StoreProvider({ children }) {
   // In the desktop app state starts empty until the planner folder is read.
   const [state, setState] = useState(() => (host ? null : loadLocal()));
   const [vault, setVault] = useState(null);
+  // Desktop: planner.json exists but isn't valid (damaged, or half-synced). Nothing is saved until the teacher decides.
+  const [loadError, setLoadError] = useState(null);
   const [toast, setToast] = useState(null);
   const saveTimer = useRef();
   const latest = useRef(state);
@@ -48,15 +50,24 @@ export function StoreProvider({ children }) {
   // ---- desktop: open the planner folder
   const openVault = useCallback(async (info) => {
     setVault(info);
+    setLoadError(null);
     if (!info?.vaultPath) return;
     const raw = await host.load();
     skipSave.current = !!raw; // freshly loaded data doesn't need writing back
     history.current = createHistory();
+    let next = null;
     try {
-      setState(raw ? migrate(JSON.parse(raw)) : null);
-    } catch {
-      setToast({ text: 'planner.json could not be read. Restore a file from the backups folder.', error: true });
+      next = raw ? migrate(JSON.parse(raw)) : null;
+    } catch (err) {
+      // Never fall through to the "start a new planner" screen: that would save over the file.
+      skipSave.current = true;
+      latest.current = null;
+      setState(null);
+      setLoadError({ message: err?.message || 'Invalid file' });
+      return;
     }
+    latest.current = next;
+    setState(next);
   }, []);
 
   useEffect(() => {
@@ -65,9 +76,17 @@ export function StoreProvider({ children }) {
     const off = host.onExternalChange(async () => {
       const raw = await host.load();
       if (!raw) return;
+      let next;
+      try {
+        next = migrate(JSON.parse(raw));
+      } catch {
+        return; // half-synced or damaged copy: keep what's on screen (it's saved again with the next change)
+      }
       skipSave.current = true;
       history.current = createHistory();
-      setState(migrate(JSON.parse(raw)));
+      latest.current = next;
+      setState(next);
+      setLoadError(null);
       setToast({ text: 'Planner updated with changes from another computer.' });
     });
     const flush = () => {
@@ -77,6 +96,27 @@ export function StoreProvider({ children }) {
     window.addEventListener('beforeunload', flush);
     return () => { off(); window.removeEventListener('beforeunload', flush); };
   }, [openVault]);
+
+  // ---- browser: another tab (or an "Open view" tab) saved the planner
+  useEffect(() => {
+    if (host) return undefined;
+    const onStorage = (e) => {
+      if (e.key !== KEY || e.storageArea !== localStorage || e.newValue == null) return;
+      let next;
+      try {
+        next = migrate(JSON.parse(e.newValue));
+      } catch {
+        return;
+      }
+      clearTimeout(saveTimer.current); // the other tab's copy is newer; don't write ours over it
+      skipSave.current = true; // just loaded, nothing to save back
+      history.current = createHistory(); // undo steps from before would roll back the other tab's work
+      latest.current = next;
+      setState(next);
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   // ---- persist
   useEffect(() => {
@@ -141,6 +181,7 @@ export function StoreProvider({ children }) {
   const replace = useCallback((next) => {
     if (latest.current) history.current = record(history.current, latest.current, Date.now(), true);
     skipSave.current = false;
+    setLoadError(null);
     latest.current = migrate(next);
     setState(latest.current);
   }, []);
@@ -171,8 +212,8 @@ export function StoreProvider({ children }) {
   const calendar = useMemo(() => (year ? buildCalendar(year, classes) : null), [year, classes]);
 
   const value = useMemo(
-    () => ({ state, update, applyRemote, replace, undo, redo, notify, toast, year, classes, calendar, userId: state?.currentUserId, vault, openVault, latest }),
-    [state, update, applyRemote, replace, undo, redo, notify, toast, year, classes, calendar, vault, openVault],
+    () => ({ state, update, applyRemote, replace, undo, redo, notify, toast, year, classes, calendar, userId: state?.currentUserId, vault, openVault, loadError, latest }),
+    [state, update, applyRemote, replace, undo, redo, notify, toast, year, classes, calendar, vault, openVault, loadError],
   );
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }

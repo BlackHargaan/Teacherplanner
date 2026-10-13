@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../lib/store.jsx';
 import { canEdit, canView, standardIndex, standardOptions, uid } from '../lib/model.js';
-import { achievement, letterGrade, studentAverage } from '../lib/reports.js';
-import { toCSV } from '../lib/csv.js';
+import { achievement, assignmentAverage, letterGrade, parseScore, studentAverage } from '../lib/reports.js';
+import { toCSVFile } from '../lib/csv.js';
 import { formatDate, today } from '../lib/dates.js';
 import { Empty, Field, Modal, MultiPicker, download } from '../components/ui.jsx';
 
@@ -24,13 +24,13 @@ export default function Gradebook() {
   const assignments = [...gb.assignments].sort((a, b) => a.date.localeCompare(b.date));
   const students = [...cls.students].sort((a, b) => `${a.last}${a.first}`.localeCompare(`${b.last}${b.first}`));
 
-  const exportCsv = () => download(`${cls.name}${term ? ` ${term.name}` : ''}-grades.csv`, toCSV([
+  const exportCsv = () => download(`${cls.name}${term ? ` ${term.name}` : ''}-grades.csv`, toCSVFile([
     ['Last', 'First', ...assignments.map((a) => `${a.name} (${a.points})`), 'Average', 'Grade'],
     ...students.map((s) => {
       const avg = studentAverage(gb, s.id);
-      return [s.last, s.first, ...assignments.map((a) => gb.scores?.[a.id]?.[s.id] ?? ''), avg == null ? '' : avg.toFixed(1), letterGrade(avg)];
+      return [s.last, s.first, ...assignments.map((a) => String(gb.scores?.[a.id]?.[s.id] ?? '').trim()), avg == null ? '' : avg.toFixed(1), letterGrade(avg)];
     }),
-  ]), 'text/csv');
+  ]), 'text/csv;charset=utf-8');
 
   return (
     <div className="page">
@@ -93,7 +93,8 @@ export default function Gradebook() {
                     <td className="nowrap"><button className="link-btn" onClick={() => setReport(s)}>{s.last}, {s.first}</button></td>
                     {assignments.map((a) => {
                       const v = gb.scores?.[a.id]?.[s.id] ?? '';
-                      const low = v !== '' && Number(v) / a.points < 0.6;
+                      const n = parseScore(v);
+                      const low = n != null && n / a.points < 0.6;
                       return (
                         <td key={a.id}>
                           <input
@@ -113,8 +114,8 @@ export default function Gradebook() {
               <tr className="total">
                 <td>Class average</td>
                 {assignments.map((a) => {
-                  const vals = students.map((s) => gb.scores?.[a.id]?.[s.id]).filter((v) => v !== '' && v != null).map(Number);
-                  return <td key={a.id}>{vals.length ? `${((vals.reduce((x, y) => x + y, 0) / vals.length / a.points) * 100).toFixed(0)}%` : ''}</td>;
+                  const pct = assignmentAverage(gb, a, students.map((s) => s.id));
+                  return <td key={a.id}>{pct == null ? '' : `${pct.toFixed(0)}%`}</td>;
                 })}
                 <td />
               </tr>
@@ -165,7 +166,8 @@ function StudentReport({ cls, gb, term, student, yearStart, onClose }) {
         <tbody>
           {gb.assignments.map((a) => {
             const v = gb.scores?.[a.id]?.[student.id];
-            return <tr key={a.id}><td>{a.name}</td><td>{formatDate(a.date)}</td><td>{v === '' || v == null ? <span className="muted">missing</span> : `${v} / ${a.points}`}</td></tr>;
+            const blank = v == null || String(v).trim() === '';
+            return <tr key={a.id}><td>{a.name}</td><td>{formatDate(a.date)}</td><td>{blank ? <span className="muted">missing</span> : parseScore(v) == null ? String(v).trim() : `${v} / ${a.points}`}</td></tr>;
           })}
         </tbody>
       </table>

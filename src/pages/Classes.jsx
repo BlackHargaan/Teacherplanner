@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useStore } from '../lib/store.jsx';
 import { canEdit, canView, makeClass, uid, yearClasses } from '../lib/model.js';
-import { pruneOrphans } from '../lib/actions.js';
+import { deleteClassLocally } from '../lib/actions.js';
 import { dayKeyLabel, dayKeysFor } from '../lib/schedule.js';
 import { CLASS_COLORS, FONTS, FONT_SIZES } from '../data/presets.js';
 import { ColorInput, Field, Tabs, Empty } from '../components/ui.jsx';
@@ -24,14 +24,7 @@ export default function Classes() {
   };
   const deleteClass = () => {
     if (!window.confirm(`Delete “${cls.name}” and all its lessons, roster and grades?`)) return;
-    update((d) => {
-      d.classes = d.classes.filter((c) => c.id !== cls.id);
-      for (const y of d.years) {
-        y.overrides = (y.overrides || []).filter((o) => o.classId !== cls.id);
-        for (const t of y.dayTypes || []) t.slots = t.slots.filter((s) => s.classId !== cls.id);
-      }
-      pruneOrphans(d);
-    });
+    update((d) => deleteClassLocally(d, cls.id), { separate: true });
     setSelected(null);
     notify('Class deleted', { undo: true });
   };

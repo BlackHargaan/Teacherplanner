@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useStore } from '../lib/store.jsx';
 import { canEdit, canView, uid } from '../lib/model.js';
 import { Empty, Field } from '../components/ui.jsx';
+import { gridSize, pruneSeats, seatedIds, seatsOutsideGrid } from '../lib/seating.js';
 
 function newChart(name = 'Main layout') {
   return { id: uid('seat'), name, rows: 5, cols: 6, disabled: [], seats: {} };
@@ -34,13 +35,15 @@ export default function Seating() {
     );
   }
 
-  const seated = new Set(Object.values(chart.seats));
+  const seated = seatedIds(chart);
   const unseated = cls.students.filter((s) => !seated.has(s.id));
   const student = (id) => cls.students.find((s) => s.id === id);
   const dropOn = (key) => {
     if (!dragging || !editable) return;
     editChart((c) => {
       const occupant = c.seats[key];
+      // a student only ever sits in one place
+      for (const [k, id] of Object.entries(c.seats)) if (id === dragging.studentId && k !== dragging.from) delete c.seats[k];
       if (dragging.from) {
         if (occupant) c.seats[dragging.from] = occupant; else delete c.seats[dragging.from];
       }
@@ -48,6 +51,8 @@ export default function Seating() {
     });
     setDragging(null);
   };
+  // Lowering Rows or Columns unseats anyone left outside the grid (once the box is left, so typing "12" doesn't pass through 1).
+  const unseatOutside = () => { if (seatsOutsideGrid(chart).length) editChart(pruneSeats); };
   const unseat = () => {
     if (dragging?.from) editChart((c) => { delete c.seats[dragging.from]; });
     setDragging(null);
@@ -81,8 +86,8 @@ export default function Seating() {
       {editable && (
         <div className="card row wrap no-print">
           <Field label="Name" inline><input value={chart.name} onChange={(e) => editChart((c) => { c.name = e.target.value; })} /></Field>
-          <Field label="Rows" inline><input type="number" className="mini" min="1" max="15" value={chart.rows} onChange={(e) => editChart((c) => { c.rows = Number(e.target.value); })} /></Field>
-          <Field label="Columns" inline><input type="number" className="mini" min="1" max="15" value={chart.cols} onChange={(e) => editChart((c) => { c.cols = Number(e.target.value); })} /></Field>
+          <Field label="Rows" inline><input type="number" className="mini" min="1" max="15" value={chart.rows} onChange={(e) => { const n = gridSize(e.target.value); if (n) editChart((c) => { c.rows = n; }); }} onBlur={unseatOutside} /></Field>
+          <Field label="Columns" inline><input type="number" className="mini" min="1" max="15" value={chart.cols} onChange={(e) => { const n = gridSize(e.target.value); if (n) editChart((c) => { c.cols = n; }); }} onBlur={unseatOutside} /></Field>
           <label className="row small"><input type="checkbox" checked={layoutMode} onChange={(e) => setLayoutMode(e.target.checked)} /> Edit layout (click cells to add/remove desks)</label>
           <button onClick={shuffle}>Random</button>
           <button onClick={alpha}>Alphabetical</button>

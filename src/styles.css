@@ -407,3 +407,4 @@ kbd { font: inherit; font-size: 0.8em; border: 1px solid var(--border); border-b
   .brush-label { min-width: 0; flex: 1 1 100%; }
   .subcard, .card:has(> .stack > .bells), .card:has(> .table) { overflow-x: auto; }
 }
+.import-table tr.muted td { color: var(--muted); }

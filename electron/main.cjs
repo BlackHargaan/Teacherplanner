@@ -227,6 +227,19 @@ ipcMain.handle('vault:save-attachment', (_e, { name, data }) => {
 
 ipcMain.handle('vault:open-path', (_e, rel) => shell.openPath(rel ? insideVault(rel) : vaultPath));
 
+// District calendars (.ics links). Fetched here rather than in the page,
+// because calendar servers don't allow cross-site requests from browsers.
+const CALENDAR_MAX_BYTES = 15 * 1024 * 1024;
+ipcMain.handle('calendar:fetch', async (_e, url) => {
+  const target = new URL(String(url));
+  if (!['https:', 'http:'].includes(target.protocol)) throw new Error('Only web links can be imported.');
+  const res = await net.fetch(target.toString(), { signal: AbortSignal.timeout(15000), headers: { Accept: 'text/calendar, */*' } });
+  if (!res.ok) throw new Error(`The calendar couldn’t be downloaded (error ${res.status}). Check that it’s shared publicly.`);
+  const body = await res.arrayBuffer();
+  if (body.byteLength > CALENDAR_MAX_BYTES) throw new Error('That calendar is too large to import.');
+  return new TextDecoder('utf-8').decode(body);
+});
+
 ipcMain.handle('update:status', () => updates.getStatus());
 ipcMain.handle('update:check', () => updates.check());
 ipcMain.handle('update:install', () => updates.install());

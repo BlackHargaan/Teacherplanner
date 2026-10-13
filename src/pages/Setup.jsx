@@ -7,10 +7,12 @@ import { DOW_SHORT, formatDate, shiftYear } from '../lib/dates.js';
 import { Field, Modal, Empty } from '../components/ui.jsx';
 import YearCalendar from '../components/YearCalendar.jsx';
 import BellSchedule from '../components/BellSchedule.jsx';
+import CalendarImport from '../components/CalendarImport.jsx';
 
 export default function Setup() {
   const { state, update, year, notify } = useStore();
   const [rollover, setRollover] = useState(false);
+  const [importing, setImporting] = useState(false);
   const setYear = (patch) => update((d) => Object.assign(d.years.find((y) => y.id === year.id), patch));
   const editYear = (fn) => update((d) => fn(d.years.find((y) => y.id === year.id)));
   const days = schoolDays(year);
@@ -84,8 +86,14 @@ export default function Setup() {
         <GradingPeriods year={year} editYear={editYear} />
 
         <section className="card wide">
-          <h2>Year calendar</h2>
-          <p className="small muted">Mark breaks, workdays and special schedules from your district calendar. Lessons move automatically when days change.</p>
+          <div className="row wrap">
+            <h2 className="grow">Year calendar</h2>
+            <button onClick={() => setImporting(true)}>{year.calendarSource ? 'Update from district calendar…' : 'Import district calendar…'}</button>
+          </div>
+          <p className="small muted">
+            Mark breaks, workdays and special schedules from your district calendar, or import it from a calendar link or .ics file. Lessons move automatically when days change.
+            {year.calendarSource && ` Last imported ${formatDate(year.calendarSource.importedAt.slice(0, 10))}.`}
+          </p>
           <YearCalendar year={year} editYear={editYear} />
           <NonSchoolDays year={year} editYear={editYear} />
         </section>
@@ -122,6 +130,7 @@ export default function Setup() {
         </section>
       </div>
 
+      {importing && <CalendarImport year={year} onClose={() => setImporting(false)} />}
       {rollover && <RolloverDialog onClose={() => setRollover(false)} onDone={() => notify('New year created from last year’s schedule and lessons')} />}
     </div>
   );
@@ -212,7 +221,12 @@ function DayTypes({ year, editYear, classes }) {
               })} /> Set times by bell period (whichever classes meet that day keep their period)
             </label>
           )}
-          {t.periodTimes ? (
+          {t.periodTimes && !(year.periods || []).length ? (
+            <div className="row wrap small">
+              <span className="muted grow">Classes meet at their regular times on this day. Add a bell schedule above to shorten periods.</span>
+              <button onClick={() => editYear((y) => { delete y.dayTypes.find((x) => x.id === t.id).periodTimes; })}>Set times per class instead</button>
+            </div>
+          ) : t.periodTimes ? (
             <table className="table compact">
               <thead><tr><th>Period</th><th>Meets?</th><th>Start</th><th>End</th></tr></thead>
               <tbody>

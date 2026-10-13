@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('plannerHost', {
   saveSync: (json) => ipcRenderer.sendSync('vault:save-sync', json),
   saveAttachment: (name, data) => ipcRenderer.invoke('vault:save-attachment', { name, data }),
   openPath: (rel) => ipcRenderer.invoke('vault:open-path', rel),
+  fetchCalendar: (url) => ipcRenderer.invoke('calendar:fetch', url),
   updates: {
     status: () => ipcRenderer.invoke('update:status'),
     check: () => ipcRenderer.invoke('update:check'),

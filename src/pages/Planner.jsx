@@ -17,7 +17,8 @@ export default function Planner() {
     const t = planningAnchor();
     return t < year.start ? year.start : t > year.end ? year.end : t;
   });
-  const [mode, setMode] = useState('week');
+  // Phones start on one day at a time; a week of columns is too cramped there.
+  const [mode, setMode] = useState(() => (typeof window !== 'undefined' && window.matchMedia?.('(max-width: 599px)').matches ? 'day' : 'week'));
   const [hidden, setHidden] = useState([]);
   const [editing, setEditing] = useState(null);
   const [dialog, setDialog] = useState(null);

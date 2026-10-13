@@ -136,7 +136,8 @@ function DayColumn({ date, day, shownIds, detail, onOpen, onDialog }) {
         <div>
           <div className="day-name">{formatDate(date, { weekday: 'short', month: 'short', day: 'numeric' })}</div>
           <div className="small muted">
-            {day ? dayKeyLabel(day.dayKey, year) : outside ? 'Outside school year' : off ? off.label : 'No school'}
+            {/* On a weekly schedule the day label would just repeat the weekday. */}
+            {day ? (year.scheduleType === 'weekly' ? '' : dayKeyLabel(day.dayKey, year)) : outside ? 'Outside school year' : off ? off.label : 'No school'}
             {day?.dayType && <span className="badge">{day.dayType.name}</span>}
           </div>
         </div>

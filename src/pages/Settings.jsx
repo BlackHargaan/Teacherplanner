@@ -4,7 +4,7 @@ import { AccountCard } from '../components/CloudAccount.jsx';
 import { useHashRoute } from '../lib/router.js';
 import { host, useStore, resetToDemo, resetToEmpty } from '../lib/store.jsx';
 import { uid } from '../lib/model.js';
-import { Modal, download } from '../components/ui.jsx';
+import { Field, Modal, download } from '../components/ui.jsx';
 import { formatDate } from '../lib/dates.js';
 import { today } from '../lib/dates.js';
 import { MODES, PALETTES } from '../data/themes.js';
@@ -73,8 +73,8 @@ export default function Settings() {
 
         <section className="card">
           <h2>My profile</h2>
-          <div className="row"><input value={me.name} onChange={(e) => update((d) => { d.users.find((u) => u.id === userId).name = e.target.value; })} /></div>
-          <div className="row"><input value={me.email} placeholder="Email" onChange={(e) => update((d) => { d.users.find((u) => u.id === userId).email = e.target.value; })} /></div>
+          <Field label="Name (shown on shared pages)"><input value={me.name} onChange={(e) => update((d) => { d.users.find((u) => u.id === userId).name = e.target.value; })} /></Field>
+          <Field label="Email"><input type="email" value={me.email} placeholder="you@school.org" onChange={(e) => update((d) => { d.users.find((u) => u.id === userId).email = e.target.value; })} /></Field>
         </section>
 
         <section className="card">

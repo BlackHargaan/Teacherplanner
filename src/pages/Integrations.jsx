@@ -73,7 +73,10 @@ export default function Integrations() {
           <ul className="list">
             {attachments.map((a) => (
               <li key={`${a.e.uid}-${a.id}`}>
-                <span className="grow">{a.e.cls.name}: {a.name}</span>
+                <span className="grow">
+                  {formatDate(a.e.date)} · {a.e.title}
+                  <br /><span className="small muted">{a.name}</span>
+                </span>
                 <a href={classroomShareLink(a.url, `${a.e.title} — ${a.name}`)} target="_blank" rel="noreferrer">Share to Classroom</a>
               </li>
             ))}

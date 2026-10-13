@@ -55,7 +55,7 @@ input, select, textarea, button, .btn {
   border-radius: 7px; padding: 0.4rem 0.6rem;
 }
 textarea { width: 100%; resize: vertical; }
-input[type="color"] { width: 2.4rem; height: 2rem; padding: 2px; cursor: pointer; }
+input[type="color"] { width: 2.4rem; height: 2rem; padding: 2px; cursor: pointer; flex: none; }
 /* Section colors stay readable on dark backgrounds by mixing toward the text color. */
 .sec-text { color: color-mix(in srgb, var(--sec, var(--text)) calc(100% - var(--sec-mix, 0%)), var(--text)); }
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
@@ -437,3 +437,9 @@ kbd { font: inherit; font-size: 0.8em; border: 1px solid var(--border); border-b
   .who select { flex: 1 1 0; min-width: 0; }
 }
 .row.wrap > .title-input { min-width: min(100%, 14rem); }
+/* Buttons in a card keep their own width instead of stretching like a field. */
+.card > button, .card > .btn, .subcard > button { align-self: flex-start; }
+/* The gradebook sizes to its columns, so averages sit next to the scores. */
+.grade-table { width: auto; min-width: min(100%, 36rem); align-self: flex-start; }
+.grade-table td:first-child, .grade-table th:first-child { min-width: 12rem; }
+.row > input.grow { min-width: 0; }

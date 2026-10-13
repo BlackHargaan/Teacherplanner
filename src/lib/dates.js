@@ -1,7 +1,7 @@
 // Dates are handled as local ISO strings ("YYYY-MM-DD") to avoid timezone drift.
 
 export function toISO(d) {
-  const y = d.getFullYear();
+  const y = String(d.getFullYear()).padStart(4, '0');
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
@@ -9,7 +9,27 @@ export function toISO(d) {
 
 export function fromISO(iso) {
   const [y, m, d] = iso.split('-').map(Number);
-  return new Date(y, m - 1, d);
+  // setFullYear, because new Date(2, …) means 1902: a year typed halfway
+  // ("0002-08-24") must stay year 2, not jump to the 1900s.
+  const date = new Date(2000, 0, 1);
+  date.setFullYear(y, m - 1, d);
+  return date;
+}
+
+/** A complete, real date ("2026-08-24") worth saving; not a year still being typed. */
+export function isFullDate(iso) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso || '') || Number(iso.slice(0, 4)) < 1900) return false;
+  return toISO(fromISO(iso)) === iso;
+}
+
+/**
+ * Why a first/last day pair can't be saved yet ('' when it can): each must be
+ * a whole date from 1900 on, and the year can't end before it starts.
+ */
+export function dateRangeError(start, end) {
+  if (!isFullDate(start) || !isFullDate(end)) return 'Enter full dates (year 1900 or later).';
+  if (end < start) return 'The last day can’t be before the first day.';
+  return '';
 }
 
 export function addDays(iso, n) {
@@ -27,10 +47,9 @@ export function dayOfWeek(iso) {
   return fromISO(iso).getDay();
 }
 
-/** Monday of the week containing iso. */
-export function startOfWeek(iso) {
-  const dow = dayOfWeek(iso);
-  return addDays(iso, dow === 0 ? -6 : 1 - dow);
+/** First day of the week containing iso: Monday, or firstDow (0 = Sunday …). */
+export function startOfWeek(iso, firstDow = 1) {
+  return addDays(iso, -((dayOfWeek(iso) - firstDow + 7) % 7));
 }
 
 export function diffDays(a, b) {

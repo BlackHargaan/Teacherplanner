@@ -12,11 +12,11 @@ const long = { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }
 export default function PrintPage() {
   const [, kind, rawDate] = useHashRoute();
   const date = /^\d{4}-\d{2}-\d{2}$/.test(rawDate || '') ? rawDate : planningAnchor();
-  const { notify } = useStore();
+  const { notify, year } = useStore();
   const [opts, setOpts] = useState({ layout: 'day', details: true, standards: true, supports: true, attachments: true, pageBreaks: false });
   const set = (k) => (e) => setOpts({ ...opts, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
   const isSub = kind === 'sub';
-  const fileName = isSub ? `Sub Plans - ${date}.pdf` : `Lesson Plans - Week of ${weekDates(date)[0]}.pdf`;
+  const fileName = isSub ? `Sub Plans - ${date}.pdf` : `Lesson Plans - Week of ${weekDates(date, year.weekdays)[0]}.pdf`;
 
   const savePdf = async () => {
     if (!host?.savePdf) { window.print(); return; }
@@ -91,7 +91,7 @@ function WeekPlans({ date, opts }) {
   const me = currentUser(state);
   const std = standardIndex(state);
   const visible = classes.filter((c) => canView(c, userId));
-  const days = weekDates(date).map((d) => calendar.byDate[d]).filter(Boolean);
+  const days = weekDates(date, year.weekdays).map((d) => calendar.byDate[d]).filter(Boolean);
   const lessonFor = (m) => state.lessons[visible.find((c) => c.id === m.classId)?.sequence[m.index]];
   const breakCls = opts.pageBreaks ? 'print-break' : '';
 
@@ -99,7 +99,7 @@ function WeekPlans({ date, opts }) {
     <>
       <header className="print-head">
         <h1>Lesson Plans</h1>
-        <p>Week of {formatDate(weekDates(date)[0], long)}</p>
+        <p>Week of {formatDate(weekDates(date, year.weekdays)[0], long)}</p>
         <p className="muted">{me?.name}{me?.email ? ` · ${me.email}` : ''} · {year.name}</p>
       </header>
       {days.length === 0 && <p>No school days this week.</p>}

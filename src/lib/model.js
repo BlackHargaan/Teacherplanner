@@ -1,4 +1,4 @@
-import { addDays, startOfWeek, today, shiftYear, dayOfWeek, planningAnchor } from './dates.js';
+import { addDays, diffDays, startOfWeek, today, dayOfWeek, planningAnchor } from './dates.js';
 import { BUILTIN_FRAMEWORKS } from '../data/standards.js';
 import {
   CLASS_COLORS, DEFAULT_SCALE, DEFAULT_STATUSES, LESSON_LAYOUTS, SECTION_COLORS,
@@ -260,13 +260,24 @@ export function scheduledLessons(state, calendar, cls, start, end) {
 // ---------------------------------------------------------------- year rollover
 
 /**
+ * How far to move last year's dates: whole weeks, so Labor Day stays a
+ * Monday and a Friday workday stays a Friday. 52 weeks unless the new year
+ * starts on a known date.
+ */
+export function rolloverDays(srcStart, newStart) {
+  if (!srcStart || !newStart) return 364;
+  return Math.round(diffDays(srcStart, newStart) / 7) * 7;
+}
+
+/**
  * Copy a year (calendar shape, classes, sections, time slots, templates and
  * lesson sequences) into a new year. Lessons are deep-copied so the new year
  * can be adapted without changing last year's record.
  */
 export function rolloverYear(state, yearId, { name, start, end, copyLessons = true }) {
   const src = state.years.find((y) => y.id === yearId);
-  const shift = (d) => shiftYear(d, 1);
+  const offset = rolloverDays(src.start, start);
+  const shift = (d) => addDays(d, offset);
   const classMap = {};
   const newYear = {
     ...structuredClone(src),
@@ -283,32 +294,32 @@ export function rolloverYear(state, yearId, { name, start, end, copyLessons = tr
   };
   const newClasses = [];
   const newLessons = {};
-  for (const cls of state.classes.filter((c) => c.yearId === yearId)) {
+  const srcClasses = state.classes.filter((c) => c.yearId === yearId);
+  // One map for the whole year, so a lesson linked into another class
+  // ("Link into another class") follows its copy, not last year's lesson.
+  const fromYear = new Set(srcClasses.map((c) => c.id));
+  const idMap = {};
+  for (const cls of srcClasses) classMap[cls.id] = uid('class');
+  if (copyLessons) {
+    for (const lid of new Set(srcClasses.flatMap((c) => c.sequence))) {
+      const lesson = lid && state.lessons[lid];
+      if (!lesson || lesson.homeType !== 'class' || !fromYear.has(lesson.homeId)) continue; // bank lessons keep their ids
+      const nl = { ...structuredClone(lesson), id: uid('lesson'), homeId: classMap[lesson.homeId], statusIds: [], updatedAt: Date.now() };
+      idMap[lid] = nl.id;
+      newLessons[nl.id] = nl;
+    }
+  }
+  for (const cls of srcClasses) {
     const copy = structuredClone(cls);
-    copy.id = uid('class');
+    copy.id = classMap[cls.id];
     copy.yearId = newYear.id;
     copy.students = [];
     copy.gradebook = { categories: cls.gradebook.categories, assignments: [], scores: {} };
     copy.seatingCharts = (cls.seatingCharts || []).map((c) => ({ ...c, seats: {} }));
     copy.standardScores = [];
-    classMap[cls.id] = copy.id;
-    if (copyLessons) {
-      const idMap = {};
-      copy.sequence = cls.sequence.map((lid) => {
-        if (!lid) return null;
-        const lesson = state.lessons[lid];
-        if (!lesson) return null;
-        if (lesson.homeType !== 'class' || lesson.homeId !== cls.id) return lid; // keep links to shared content
-        if (!idMap[lid]) {
-          const nl = { ...structuredClone(lesson), id: uid('lesson'), homeId: copy.id, statusIds: [], updatedAt: Date.now() };
-          idMap[lid] = nl.id;
-          newLessons[nl.id] = nl;
-        }
-        return idMap[lid];
-      });
-    } else {
-      copy.sequence = [];
-    }
+    copy.sequence = copyLessons
+      ? cls.sequence.map((lid) => (lid && state.lessons[lid] ? idMap[lid] || lid : null)) // shared content keeps its link
+      : [];
     newClasses.push(copy);
   }
   // A school profile belongs to one school year; next year is shared (or

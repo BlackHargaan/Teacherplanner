@@ -46,6 +46,24 @@ export const CANCELLED_ROTATION = {
   shift: 'The rotation picks up where it left off',
 };
 
+/**
+ * The day a school week starts on: the first school day after the weekend
+ * (Monday for Mon–Fri, Sunday for Sun–Thu). With several gaps, the longest
+ * one is the weekend.
+ */
+export function weekStartDay(weekdays = [1, 2, 3, 4, 5]) {
+  const on = new Set(weekdays);
+  let best = 1;
+  let bestGap = 0;
+  for (const d of [1, 2, 3, 4, 5, 6, 0]) {
+    if (!on.has(d)) continue;
+    let gap = 0;
+    while (gap < 6 && !on.has((d - gap - 1 + 7) % 7)) gap += 1;
+    if (gap > bestGap) { best = d; bestGap = gap; }
+  }
+  return best;
+}
+
 export function isNonSchoolDay(year, date) {
   return (year.nonSchoolDays || []).find(
     (r) => date >= r.start && date <= (r.end || r.start),
@@ -60,7 +78,8 @@ export function schoolDays(year) {
   const weekdays = new Set(year.weekdays || [1, 2, 3, 4, 5]);
   const dayTypes = Object.fromEntries((year.dayTypes || []).map((t) => [t.id, t]));
   const assignments = year.dayAssignments || {};
-  const firstWeek = startOfWeek(year.start);
+  const weekStart = weekStartDay(year.weekdays);
+  const firstWeek = startOfWeek(year.start, weekStart);
   const cycleLength = Math.max(1, Number(year.cycleLength) || 6);
   const rotation = year.rotationOverrides || {};
   const cancelledKeepsDay = (year.cancelledDayRotation || 'keep') === 'keep';
@@ -74,17 +93,19 @@ export function schoolDays(year) {
     // rotation continues from there.
     if (year.scheduleType === 'cycle' && rotation[date]) cycleIndex = Math.max(0, Number(String(rotation[date]).slice(1)) - 1);
     const off = isNonSchoolDay(year, date);
+    const dayType = assignments[date] ? dayTypes[assignments[date]] : null;
     if (off) {
-      if (year.scheduleType === 'cycle' && off.kind === 'cancelled' && cancelledKeepsDay) cycleIndex += 1;
+      // A cancelled day keeps its place in the rotation, unless it was a
+      // day (pep rally…) that wasn't going to count anyway.
+      if (year.scheduleType === 'cycle' && off.kind === 'cancelled' && cancelledKeepsDay && dayType?.countsInRotation !== false) cycleIndex += 1;
       continue;
     }
-    const dayType = assignments[date] ? dayTypes[assignments[date]] : null;
     let dayKey;
     if (year.scheduleType === 'cycle') {
       dayKey = `C${(cycleIndex % cycleLength) + 1}`;
       if (!dayType || dayType.countsInRotation !== false) cycleIndex += 1;
     } else if (year.scheduleType === 'biweekly') {
-      const week = Math.floor(diffDays(firstWeek, startOfWeek(date)) / 7);
+      const week = Math.floor(diffDays(firstWeek, startOfWeek(date, weekStart)) / 7);
       dayKey = `${week % 2 === 0 ? 'A' : 'B'}${dayOfWeek(date)}`;
     } else {
       dayKey = `W${dayOfWeek(date)}`;
@@ -191,7 +212,24 @@ export function splitGradingPeriods(year, count, name = 'Quarter') {
   });
 }
 
-export function weekDates(anchor) {
-  const monday = startOfWeek(anchor);
-  return Array.from({ length: 7 }, (_, i) => addDays(monday, i));
+/** The 7 dates of the school week containing anchor (starting Sunday for Sun–Thu schools). */
+export function weekDates(anchor, weekdays) {
+  const first = startOfWeek(anchor, weekStartDay(weekdays));
+  return Array.from({ length: 7 }, (_, i) => addDays(first, i));
+}
+
+/**
+ * Change the number of days in a rotating cycle (mutates the year draft).
+ * The starting day and "this is Day 5" marks can't point past the end, so
+ * they're pulled back in; class meeting times on removed days are kept (in
+ * case the teacher changes it back) and counted so the teacher can be told.
+ */
+export function setCycleLength(year, length, classes = []) {
+  year.cycleLength = length;
+  if ((Number(year.cycleStartDay) || 1) > length) year.cycleStartDay = 1;
+  for (const [d, key] of Object.entries(year.rotationOverrides || {})) {
+    if (Number(String(key).slice(1)) > length) delete year.rotationOverrides[d];
+  }
+  const outside = (s) => /^C\d+$/.test(s.dayKey || '') && Number(s.dayKey.slice(1)) > length;
+  return classes.reduce((n, c) => n + (c.slots || []).filter(outside).length, 0);
 }

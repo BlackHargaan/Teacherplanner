@@ -5,7 +5,7 @@ import { canEdit, canView, uid } from '../lib/model.js';
 import { bump, clearAt, extend, insertAt, move, placeOrInsert, pullBack, swap } from '../lib/sequence.js';
 import { copyLesson, editSequence, pruneOrphans } from '../lib/actions.js';
 import { addDays, formatDate, formatTime, planningAnchor, startOfWeek, today, DOW_LONG } from '../lib/dates.js';
-import { dayKeyLabel, isNonSchoolDay, meetingIndexOnOrAfter, weekDates } from '../lib/schedule.js';
+import { dayKeyLabel, isNonSchoolDay, meetingIndexOnOrAfter, weekDates, weekStartDay } from '../lib/schedule.js';
 import { paintDates } from '../lib/calendarPaint.js';
 import { schoolReadOnly } from '../lib/cloud/schoolSync.js';
 import LessonEditor from '../components/LessonEditor.jsx';
@@ -45,7 +45,7 @@ export default function Planner() {
   const visible = classes.filter((c) => canView(c, userId));
   const shown = visible.filter((c) => !hidden.includes(c.id));
   const shownIds = new Set(shown.map((c) => c.id));
-  const dates = mode === 'day' ? [anchor] : weekDates(anchor).filter((d) => (year.weekdays || [1, 2, 3, 4, 5]).includes(new Date(d + 'T00:00').getDay()));
+  const dates = mode === 'day' ? [anchor] : weekDates(anchor, year.weekdays).filter((d) => (year.weekdays || [1, 2, 3, 4, 5]).includes(new Date(d + 'T00:00').getDay()));
   const step = mode === 'day' ? 1 : 7;
 
   return (
@@ -89,7 +89,7 @@ export default function Planner() {
           classes={visible}
           classId={focusClass || visible[0]?.id}
           setClassId={setFocusClass}
-          from={startOfWeek(anchor)}
+          from={startOfWeek(anchor, weekStartDay(year.weekdays))}
           onOpen={setEditing}
           onDialog={setDialog}
         />

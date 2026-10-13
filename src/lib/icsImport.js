@@ -3,18 +3,25 @@
 // workdays, early release, quarter ends) with everything else (birthdays,
 // meetings, testing windows), so events are classified by name and the
 // teacher reviews the result before anything changes.
-import { addDays, dayOfWeek } from './dates.js';
+import { addDays, dayOfWeek, toISO } from './dates.js';
 import { datesBetween, offDayMap, paintDates } from './calendarPaint.js';
 
 // ---------------------------------------------------------------- parsing
 
 const unescapeText = (s) => s.replace(/\\n/gi, ' ').replace(/\\([,;\\])/g, '$1').trim();
 
-/** "20261222" or "20261222T153000Z" -> { date: '2026-12-22', time: '15:30' | null } */
+/**
+ * "20261222" or "20261222T153000Z" -> { date: '2026-12-22', time: '15:30' | null, at: Date | null }
+ * Times ending in Z are UTC (Google Calendar writes them that way) and become
+ * this computer's date and time; times without Z are read as they are.
+ */
 function parseStamp(value) {
-  const m = /^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})?Z?)?/.exec(value || '');
+  const m = /^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})?(Z?))?/.exec(value || '');
   if (!m) return null;
-  return { date: `${m[1]}-${m[2]}-${m[3]}`, time: m[4] ? `${m[4]}:${m[5]}` : null };
+  if (!m[4]) return { date: `${m[1]}-${m[2]}-${m[3]}`, time: null, at: null };
+  const [y, mo, d, h, mi, sec] = m.slice(1, 7).map((x) => Number(x) || 0);
+  const at = m[7] ? new Date(Date.UTC(y, mo - 1, d, h, mi, sec)) : new Date(y, mo - 1, d, h, mi, sec);
+  return { date: toISO(at), time: `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`, at };
 }
 
 /** Parse the VEVENTs of an iCalendar file. All-day end dates become inclusive. */
@@ -48,7 +55,9 @@ export function parseICS(text) {
     const endStamp = parseStamp(p.DTEND?.value);
     const allDay = !start.time || p.DTSTART.params.includes('VALUE=DATE');
     let end = start.date;
-    if (endStamp) end = allDay ? addDays(endStamp.date, -1) : endStamp.date;
+    // The end is exclusive: an all-day event "to" Dec 23 ends Dec 22, and a
+    // timed event ending at midnight ends the day before.
+    if (endStamp) end = allDay ? addDays(endStamp.date, -1) : endStamp.at ? toISO(new Date(endStamp.at.getTime() - 1000)) : endStamp.date;
     if (end < start.date) end = start.date;
     return {
       uid: p.UID?.value || `event-${i}`,
@@ -153,15 +162,44 @@ export const cleanLabel = (summary) => summary.replace(/[!?.\s]+$/, '').replace(
 
 // ---------------------------------------------------------------- planning
 
-/** School years (July–June) that contain any useful events, newest first. */
+/**
+ * The month school years begin, from the calendar's "First day of school"
+ * events: July (July–June) for schools starting in the second half of the
+ * year, January (January–December) for southern-hemisphere schools starting
+ * in Jan–Mar, otherwise the month school starts (April in Japan).
+ */
+function yearStartMonth(events) {
+  const months = {};
+  for (const e of events) {
+    if (e.rrule || e.cancelled || classify(e.summary, e.allDay).use !== 'firstDay') continue;
+    const m = Number(e.start.slice(5, 7));
+    months[m] = (months[m] || 0) + 1;
+  }
+  const found = Object.keys(months).map(Number);
+  if (!found.length) return 7;
+  const usual = found.sort((a, b) => months[b] - months[a] || a - b)[0];
+  if (usual >= 7) return 7;
+  if (usual <= 3) return 1;
+  return Math.min(...found.filter((m) => m === usual || m === usual - 1)); // "April 30" one year, "May 2" the next
+}
+
+/** School years that contain any useful events, newest first. */
 export function schoolYearsIn(events) {
+  const startMonth = yearStartMonth(events);
+  const mm = String(startMonth).padStart(2, '0');
   const counts = {};
   for (const e of events) {
     if (e.rrule || e.cancelled || classify(e.summary, e.allDay).use === 'ignore') continue;
-    const y = Number(e.start.slice(0, 4)) - (Number(e.start.slice(5, 7)) < 7 ? 1 : 0);
+    const y = Number(e.start.slice(0, 4)) - (Number(e.start.slice(5, 7)) < startMonth ? 1 : 0);
     counts[y] = (counts[y] || 0) + 1;
   }
-  return Object.keys(counts).map(Number).sort((a, b) => b - a).map((y) => ({ startYear: y, label: `${y}–${String(y + 1).slice(2)}`, from: `${y}-07-01`, to: `${y + 1}-06-30`, count: counts[y] }));
+  return Object.keys(counts).map(Number).sort((a, b) => b - a).map((y) => ({
+    startYear: y,
+    label: startMonth === 1 ? String(y) : `${y}–${String(y + 1).slice(2)}`,
+    from: `${y}-${mm}-01`,
+    to: addDays(`${y + 1}-${mm}-01`, -1),
+    count: counts[y],
+  }));
 }
 
 /**
@@ -237,21 +275,41 @@ export function termsFromEnds(endRows, yearStart, yearEnd) {
 }
 
 /**
+ * The first and last day of school among reviewed rows. The last day must
+ * come after the first one (a calendar can hold the end of the year before).
+ */
+export function yearBounds(rows) {
+  const first = rows.find((r) => r.use === 'firstDay') || null;
+  const last = rows.filter((r) => r.use === 'lastDay' && (!first || r.end >= first.start)).at(-1) || null;
+  return { first, last };
+}
+
+/**
  * Apply reviewed rows to a year (mutates the draft). Returns counts for the
  * confirmation message.
  * opts: { setBounds, makeTerms, earlyTypeId, makeId, replaceDaysOff }
- * replaceDaysOff clears breaks and workdays already in the year first (a
- * re-import after the district changes its calendar); cancelled days stay.
+ * replaceDaysOff clears breaks, workdays and early release days (those using
+ * earlyTypeId) already in the year first (a re-import after the district
+ * changes its calendar); cancelled days stay. Rotation marks ("Day 3") stay
+ * too: ones the teacher set by hand look the same as imported ones, and the
+ * new calendar's marks are painted over them anyway.
  */
 export function applyImport(year, rows, opts = {}) {
   const counts = { off: 0, early: 0, rotation: 0, terms: 0, start: null, end: null };
-  if (opts.replaceDaysOff) year.nonSchoolDays = (year.nonSchoolDays || []).filter((r) => r.kind === 'cancelled');
+  if (opts.replaceDaysOff) {
+    year.nonSchoolDays = (year.nonSchoolDays || []).filter((r) => r.kind === 'cancelled');
+    for (const [d, id] of Object.entries(year.dayAssignments || {})) {
+      if (opts.earlyTypeId && id === opts.earlyTypeId) delete year.dayAssignments[d];
+    }
+  }
   const use = rows.filter((r) => r.use !== 'ignore' || r.termEnd);
   if (opts.setBounds) {
-    const first = use.find((r) => r.use === 'firstDay');
-    const last = [...use].reverse().find((r) => r.use === 'lastDay');
-    if (first) year.start = counts.start = first.start;
-    if (last) year.end = counts.end = last.end;
+    const { first, last } = yearBounds(use);
+    // Never leave the year ending before it starts (an empty planner).
+    if ((last ? last.end : year.end) >= (first ? first.start : year.start)) {
+      if (first) year.start = counts.start = first.start;
+      if (last) year.end = counts.end = last.end;
+    }
   }
   const weekdays = new Set(year.weekdays || [1, 2, 3, 4, 5]);
   // Only days inside the school year matter (workdays before the first day don't).
@@ -277,7 +335,10 @@ export function applyImport(year, rows, opts = {}) {
       }
     }
   }
-  if (opts.earlyTypeId) counts.early = Object.values(year.dayAssignments || {}).filter((id) => id === opts.earlyTypeId).length;
+  if (opts.earlyTypeId) {
+    const off = offDayMap(year); // a cancelled day keeps its schedule but isn't an early release
+    counts.early = Object.entries(year.dayAssignments || {}).filter(([d, id]) => id === opts.earlyTypeId && !off.has(d)).length;
+  }
   if (opts.makeTerms) {
     const terms = termsFromEnds(use.filter((r) => r.termEnd || r.use === 'termEnd'), year.start, year.end);
     if (terms.length) {

@@ -121,7 +121,7 @@ Lessons are stored as an ordered sequence per class: lesson *n* is taught at the
 - Custom **status tags** (Draft, Ready, Needs Review, Approved, Taught…).
 - Standards, teaching strategies, differentiation and accommodations come from a built-in library, and you can add your own entries.
 - Class color, font, text size and display order.
-- **Appearance** (Settings): 8 color palettes (Classic Blue, Teal, Forest, Sunset, Crimson, Berry, Grape, Graphite), with light, dark or match-computer mode. It's saved per teacher, and lesson-section colors stay readable in dark mode.
+- **Appearance** (Settings): the calm "Quiet Desk" look (Lexend type, pages in a sidebar with a school-year progress card, softly tinted lesson cards) in 8 palettes: Sage, Harbor, Heather, Sand & Teal, Slate, Rosewood, Marigold and Graphite. Each has a light and a dark version (or match the computer), all checked for readable contrast in `tests/themes.test.js`. It's saved per teacher, and lesson-section colors stay readable in dark mode.
 
 ### Collaboration (`Collaborate`)
 - **Team lesson banks** and **shared classes**, with *view* or *edit* access per teacher and **per-section overrides** (hidden / view / edit).

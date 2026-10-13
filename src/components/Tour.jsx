@@ -103,6 +103,7 @@ function TourStep({ tour, tourId, index, dir, route, go, finish }) {
   const [pos, setPos] = useState(null);
   const box = useRef();
   const nextBtn = useRef();
+  const nudged = useRef(false);
 
   // Go to the step's page, then wait briefly for what it highlights.
   useEffect(() => {
@@ -150,7 +151,15 @@ function TourStep({ tour, tourId, index, dir, route, go, finish }) {
     if (target === null || !box.current) return;
     const b = box.current.getBoundingClientRect();
     const spot = rect && { top: rect.top - 6, left: rect.left - 6, bottom: rect.bottom + 6, right: rect.right + 6, width: rect.width + 12, height: rect.height + 12 };
-    setPos(placeBox(spot, { width: b.width, height: b.height }, window.innerWidth, window.innerHeight));
+    const placed = placeBox(spot, { width: b.width, height: b.height }, window.innerWidth, window.innerHeight);
+    // No room above or below where it sits now, but the highlight and the box
+    // fit on screen together: scroll it up once so the box goes underneath.
+    const header = document.querySelector('.topbar')?.getBoundingClientRect().bottom || 0;
+    if (placed.placement === 'inside' && !nudged.current && spot.height + b.height + 40 <= window.innerHeight - header) {
+      nudged.current = true;
+      window.scrollBy({ top: spot.top - header - 12, behavior: reducedMotion() ? 'auto' : 'smooth' });
+    }
+    setPos(placed);
   }, [rect, target]);
 
   useEffect(() => { if (pos) nextBtn.current?.focus({ preventScroll: true }); }, [pos !== null]); // eslint-disable-line react-hooks/exhaustive-deps

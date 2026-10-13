@@ -24,6 +24,8 @@ import { navigate } from './lib/router.js';
 import { useTour } from './components/Tour.jsx';
 import { Menu } from './components/ui.jsx';
 import { TOURS } from './lib/tours.js';
+import { yearProgress } from './lib/yearProgress.js';
+import { formatDate, today } from './lib/dates.js';
 
 const PAGES = [
   ['planner', 'Planner', Planner],
@@ -97,48 +99,82 @@ export default function App() {
   const [id, , Page] = route === 'search' ? ['search', 'Search', Search] : PAGES.find(([p]) => p === route) || PAGES[0];
   const me = currentUser(state);
 
+  const sidebarNav = (
+    <nav id="main-nav" aria-label="Pages">
+      {PAGES.map(([p, label]) => <a key={p} href={`#/${p}`} className={p === id ? 'on' : ''} aria-current={p === id ? 'page' : undefined}>{label}</a>)}
+    </nav>
+  );
+
   return (
     <div className="app">
-      <header className="topbar no-print">
-        <a className="brand" href="#/planner">📘 Teacher Planner</a>
-        {/* On narrow windows the page links fold into this menu. */}
-        <button
-          type="button"
-          className="nav-toggle"
-          aria-expanded={menuOpen}
-          aria-controls="main-nav"
-          onClick={() => setMenuOpen((o) => !o)}
-        >
-          <span aria-hidden="true">☰</span> {menuOpen ? 'Close' : PAGES.find(([p]) => p === id)?.[1] || 'Menu'}
-        </button>
-        <nav id="main-nav" className={menuOpen ? 'open' : ''} aria-label="Pages">
-          {PAGES.map(([p, label]) => <a key={p} href={`#/${p}`} className={p === id ? 'on' : ''} aria-current={p === id ? 'page' : undefined}>{label}</a>)}
-        </nav>
-        <SearchBox initial={route === 'search' ? decodeURIComponent(param || '') : ''} />
-        <CloudStatus />
-        <Menu
-          className="help-menu"
-          label="?"
-          title="Help and tours"
-          items={[
-            tour.pageTour && { label: `Tour this page (${TOURS[tour.pageTour].title})`, onClick: () => tour.start(tour.pageTour) },
-            { label: 'Getting started tour', onClick: () => tour.start('start') },
-            '-',
-            { label: 'Tour settings…', onClick: () => navigate('settings/tours') },
-          ]}
-        />
-        <div className="who">
-          <select value={state.currentYearId} onChange={(e) => update((d) => { d.currentYearId = e.target.value; })} aria-label="School year">
-            {state.years.map((y) => <option key={y.id} value={y.id}>{y.name}</option>)}
-          </select>
-          <select value={me.id} onChange={(e) => update((d) => { d.currentUserId = e.target.value; })} aria-label="Signed in as" title="Signed in as">
-            {state.users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-          </select>
-        </div>
-      </header>
-      <UpdateBanner />
-      <main key={`${id}-${year?.id}-${me.id}`}><Page /></main>
+      <aside className={`sidebar no-print ${menuOpen ? 'open' : ''}`} aria-label="Teacher Planner">
+        <a className="brand" href="#/planner">
+          <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="10" fill="var(--accent)" /><path d="M6.5 11.5l3 3 6-7" fill="none" stroke="var(--accent-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          Teacher Planner
+        </a>
+        {sidebarNav}
+        <YearCard />
+      </aside>
+      {menuOpen && <div className="sidebar-backdrop no-print" onClick={() => setMenuOpen(false)} />}
+      <div className="main-col">
+        <header className="topbar no-print">
+          {/* On narrow windows the sidebar folds away behind this button. */}
+          <button
+            type="button"
+            className="nav-toggle"
+            aria-expanded={menuOpen}
+            aria-controls="main-nav"
+            onClick={() => setMenuOpen((o) => !o)}
+          >
+            <span aria-hidden="true">☰</span> {PAGES.find(([p]) => p === id)?.[1] || 'Menu'}
+          </button>
+          <div className="grow" />
+          <SearchBox initial={route === 'search' ? decodeURIComponent(param || '') : ''} />
+          <CloudStatus />
+          <Menu
+            className="help-menu"
+            label="?"
+            title="Help and tours"
+            items={[
+              tour.pageTour && { label: `Tour this page (${TOURS[tour.pageTour].title})`, onClick: () => tour.start(tour.pageTour) },
+              { label: 'Getting started tour', onClick: () => tour.start('start') },
+              '-',
+              { label: 'Tour settings…', onClick: () => navigate('settings/tours') },
+            ]}
+          />
+          {state.users.length > 1 && (
+            <select className="who" value={me.id} onChange={(e) => update((d) => { d.currentUserId = e.target.value; })} aria-label="Signed in as" title="Signed in as">
+              {state.users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+            </select>
+          )}
+        </header>
+        <UpdateBanner />
+        <main key={`${id}-${year?.id}-${me.id}`}><Page /></main>
+      </div>
       <Toast toast={toast} />
+    </div>
+  );
+}
+
+/** Sidebar card: which school year is open, and how far into it today is. */
+function YearCard() {
+  const { state, update, year, calendar } = useStore();
+  const p = year && calendar ? yearProgress(year, calendar.days, today()) : null;
+  return (
+    <div className="year-card">
+      <select value={state.currentYearId} onChange={(e) => update((d) => { d.currentYearId = e.target.value; })} aria-label="School year">
+        {state.years.map((y) => <option key={y.id} value={y.id}>{y.name}</option>)}
+      </select>
+      {p && p.total > 0 && (
+        <>
+          <div className="year-meter" role="progressbar" aria-label="School year so far" aria-valuemin={0} aria-valuemax={100} aria-valuenow={p.percent}><div style={{ width: `${p.percent}%` }} /></div>
+          <div className="small muted">
+            {p.stage === 'before' && `Starts ${formatDate(p.starts, { month: 'short', day: 'numeric' })} · ${p.total} school days`}
+            {p.stage === 'during' && `Day ${p.day} of ${p.total}${p.term ? ` · ${p.term}` : ''}`}
+            {p.stage === 'after' && `Finished · ${p.total} school days`}
+          </div>
+        </>
+      )}
     </div>
   );
 }

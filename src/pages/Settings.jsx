@@ -7,7 +7,7 @@ import { uid } from '../lib/model.js';
 import { Field, Modal, download } from '../components/ui.jsx';
 import { formatDate } from '../lib/dates.js';
 import { today } from '../lib/dates.js';
-import { MODES, PALETTES } from '../data/themes.js';
+import { MODES, PALETTES, paletteById } from '../data/themes.js';
 import { useTour } from '../components/Tour.jsx';
 import { resetPageTours, setTips } from '../lib/tours.js';
 
@@ -51,17 +51,18 @@ export default function Settings() {
         <section data-tour="appearance" className="card wide">
           <h2>Appearance</h2>
           <div className="palette-grid">
-            {PALETTES.map((p) => (
-              <button
-                key={p.id}
-                className={`palette-option ${(me.appearance?.palette || 'classic') === p.id ? 'on' : ''}`}
-                onClick={() => setAppearance({ palette: p.id })}
-                aria-pressed={(me.appearance?.palette || 'classic') === p.id}
-              >
-                <span className="palette-swatches"><span style={{ background: p.light }} /><span style={{ background: p.dark }} /></span>
-                {p.name}
-              </button>
-            ))}
+            {PALETTES.map((p) => {
+              const on = paletteById(me.appearance?.palette).id === p.id;
+              return (
+                <button key={p.id} className={`palette-option ${on ? 'on' : ''}`} onClick={() => setAppearance({ palette: p.id })} aria-pressed={on}>
+                  <span className="palette-preview" aria-hidden="true">
+                    <span style={{ background: p.light.bg }}><i style={{ background: p.light.surface2 }} /><i style={{ background: p.light.accent }} /></span>
+                    <span style={{ background: p.dark.bg }}><i style={{ background: p.dark.surface2 }} /><i style={{ background: p.dark.accent }} /></span>
+                  </span>
+                  {p.name}
+                </button>
+              );
+            })}
           </div>
           <div className="row wrap">
             <span className="small">Light or dark</span>
@@ -71,7 +72,7 @@ export default function Settings() {
               ))}
             </div>
           </div>
-          <p className="small muted">Your colors are saved with your profile. Class and lesson-section colors are set on the Classes page.</p>
+          <p className="small muted">Each palette has a light and a dark version. Your choice is saved with your profile. Class and lesson-section colors are set on the Classes page.</p>
         </section>
 
         <section className="card" id="tours">

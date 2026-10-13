@@ -2,6 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { StoreProvider } from './lib/store.jsx';
 import App from './App.jsx';
+import '@fontsource-variable/lexend';
 import { CloudProvider } from './lib/cloud/CloudProvider.jsx';
 import { TourProvider } from './components/Tour.jsx';
 import './styles.css';

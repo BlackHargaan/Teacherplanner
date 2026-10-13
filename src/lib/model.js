@@ -311,7 +311,10 @@ export function rolloverYear(state, yearId, { name, start, end, copyLessons = tr
     }
     newClasses.push(copy);
   }
-  newYear.dayTypes = (newYear.dayTypes || []).map((t) => ({
+  // A school profile belongs to one school year; next year is shared (or
+  // joined) on its own, so the copy starts unlinked.
+  delete newYear.school;
+  newYear.dayTypes = (newYear.dayTypes || []).map(({ school, ...t }) => ({
     ...t,
     slots: (t.slots || []).map((s) => ({ ...s, classId: classMap[s.classId] || s.classId })),
   }));

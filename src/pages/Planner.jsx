@@ -7,6 +7,7 @@ import { copyLesson, editSequence, pruneOrphans } from '../lib/actions.js';
 import { addDays, formatDate, formatTime, planningAnchor, startOfWeek, today, DOW_LONG } from '../lib/dates.js';
 import { dayKeyLabel, isNonSchoolDay, meetingIndexOnOrAfter, weekDates } from '../lib/schedule.js';
 import { paintDates } from '../lib/calendarPaint.js';
+import { schoolReadOnly } from '../lib/cloud/schoolSync.js';
 import LessonEditor from '../components/LessonEditor.jsx';
 import { LessonContent, StatusChips } from '../components/LessonContent.jsx';
 import { Field, Menu, Modal, Tabs, Empty } from '../components/ui.jsx';
@@ -154,6 +155,7 @@ function DayColumn({ date, day, shownIds, detail, onOpen, onDialog }) {
 
 function DayMenu({ date, day, removed, onDialog }) {
   const { update, notify, year, classes } = useStore();
+  const readOnly = schoolReadOnly(year);
   const setDayType = (id) => update((d) => {
     const y = d.years.find((x) => x.id === year.id);
     if (id) y.dayAssignments[date] = id; else delete y.dayAssignments[date];
@@ -164,7 +166,8 @@ function DayMenu({ date, day, removed, onDialog }) {
       items={[
         { label: 'Sub plans for this day (PDF)…', onClick: () => navigate(`print/sub/${date}`) },
         { label: '+ Add extra class', onClick: () => onDialog({ kind: 'extra', date }) },
-        {
+        // Days off and school schedules come from the school for its members.
+        !readOnly && {
           label: 'Cancel this day (snow day…)',
           onClick: () => {
             update((d) => paintDates(d.years.find((x) => x.id === year.id), [date], { kind: 'cancelled', label: 'Cancelled' }), { separate: true });
@@ -172,8 +175,8 @@ function DayMenu({ date, day, removed, onDialog }) {
           },
         },
         '-',
-        ...((year.dayTypes || []).map((t) => ({ label: `${day.dayType?.id === t.id ? '✓ ' : ''}Make “${t.name}”`, onClick: () => setDayType(t.id) }))),
-        day.dayType && { label: 'Restore regular schedule', onClick: () => setDayType(null) },
+        ...((year.dayTypes || []).filter((t) => !(readOnly && t.school)).map((t) => ({ label: `${day.dayType?.id === t.id ? '✓ ' : ''}Make “${t.name}”`, onClick: () => setDayType(t.id) }))),
+        day.dayType && !(readOnly && day.dayType.school) && { label: 'Restore regular schedule', onClick: () => setDayType(null) },
         (year.dayTypes || []).length === 0 && { label: 'Create alternate days in Schedule…', onClick: () => { window.location.hash = '#/setup'; } },
         removed.length > 0 && '-',
         ...removed.map((o) => ({

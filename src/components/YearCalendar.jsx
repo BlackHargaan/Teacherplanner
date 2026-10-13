@@ -31,7 +31,7 @@ const shortKey = (key, year) => {
  * drag across several to mark breaks, workdays, cancelled days, alternate
  * schedules and (for rotating schedules) which day of the rotation a date is.
  */
-export default function YearCalendar({ year, editYear }) {
+export default function YearCalendar({ year, editYear, readOnly = false }) {
   const isCycle = year.scheduleType === 'cycle';
   const brushes = useMemo(() => [
     { id: 'school', label: 'School day', brush: { kind: 'school' } },
@@ -57,6 +57,7 @@ export default function YearCalendar({ year, editYear }) {
   const now = today();
 
   const paint = (dates) => {
+    if (readOnly) return;
     const inYear = dates.filter((d) => d >= year.start && d <= year.end);
     if (!inYear.length) return;
     editYear((y) => paintDates(y, inYear, active.named ? { ...active.brush, label: label.trim() || defaultLabel(active.brush.kind) } : active.brush));
@@ -77,29 +78,33 @@ export default function YearCalendar({ year, editYear }) {
 
   return (
     <div className="yearcal">
-      <div className="yearcal-tools" role="toolbar" aria-label="Paint days">
-        {brushes.map((b) => (
-          <button
-            key={b.id}
-            type="button"
-            className={`brush brush-${b.brush.kind} ${b.id === active.id ? 'on' : ''}`}
-            aria-pressed={b.id === active.id}
-            onClick={() => { if (b.id !== active.id) setLabel(''); setBrushId(b.id); }}
-          >
-            <span className="swatch" aria-hidden="true" />{b.label}
-          </button>
-        ))}
-        {active.named && (
-          <input
-            className="brush-label"
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            placeholder={`Name, e.g. ${active.brush.kind === 'holiday' ? 'Winter break' : active.brush.kind === 'cancelled' ? 'Snow day' : 'Teacher workday'}`}
-            aria-label="Name for these days"
-          />
-        )}
-      </div>
-      <p className="small muted">Click a day, or drag across several, to mark them as <strong>{active.label.toLowerCase()}</strong>.</p>
+      {readOnly ? (
+        <p className="small muted">Your school’s calendar. Only its admins can change it.</p>
+      ) : (
+        <div className="yearcal-tools" role="toolbar" aria-label="Paint days">
+          {brushes.map((b) => (
+            <button
+              key={b.id}
+              type="button"
+              className={`brush brush-${b.brush.kind} ${b.id === active.id ? 'on' : ''}`}
+              aria-pressed={b.id === active.id}
+              onClick={() => { if (b.id !== active.id) setLabel(''); setBrushId(b.id); }}
+            >
+              <span className="swatch" aria-hidden="true" />{b.label}
+            </button>
+          ))}
+          {active.named && (
+            <input
+              className="brush-label"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder={`Name, e.g. ${active.brush.kind === 'holiday' ? 'Winter break' : active.brush.kind === 'cancelled' ? 'Snow day' : 'Teacher workday'}`}
+              aria-label="Name for these days"
+            />
+          )}
+        </div>
+      )}
+      {!readOnly && <p className="small muted">Click a day, or drag across several, to mark them as <strong>{active.label.toLowerCase()}</strong>.</p>}
 
       <div
         className="yearcal-months"
@@ -131,10 +136,11 @@ export default function YearCalendar({ year, editYear }) {
                 data-date={d}
                 className={`cal-day cal-${kind} ${selecting?.has(d) ? 'cal-selecting' : ''} ${d === now ? 'cal-today' : ''} ${marked ? 'cal-marked' : ''}`}
                 disabled={!inYear}
+                aria-disabled={readOnly || undefined}
                 title={title}
                 aria-label={`${MONTHS[m]} ${Number(d.slice(8))}${title ? `, ${title}` : ''}`}
                 onPointerDown={(e) => {
-                  if (e.button !== 0) return;
+                  if (e.button !== 0 || readOnly) return;
                   e.preventDefault();
                   dragging.current = true;
                   setAnchor(d);

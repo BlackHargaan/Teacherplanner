@@ -443,3 +443,12 @@ kbd { font: inherit; font-size: 0.8em; border: 1px solid var(--border); border-b
 .grade-table { width: auto; min-width: min(100%, 36rem); align-self: flex-start; }
 .grade-table td:first-child, .grade-table th:first-child { min-width: 12rem; }
 .row > input.grow { min-width: 0; }
+fieldset.subcard { min-width: 0; margin: 0; }
+
+/* Schedule → School profile */
+.school-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; align-items: start; }
+.school-choices .subcard { margin: 0; }
+.school-choices input { max-width: 360px; }
+.join-code code { font-size: 1.15em; letter-spacing: 0.08em; }
+.school-members { margin: 4px 0; }
+.school-members summary { cursor: pointer; }

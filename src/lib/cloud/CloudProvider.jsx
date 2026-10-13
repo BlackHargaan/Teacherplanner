@@ -1,10 +1,14 @@
-// Online account + background sync of team lesson banks.
+// Online account + background sync of team lesson banks and school profiles.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store.jsx';
 import { cloudConfigured } from './config.js';
 import * as api from './backend.js';
 import { applySnapshot, changesToPush, detachBank, fingerprint, markPushed } from './sync.js';
 import { deleteBankLocally } from '../actions.js';
+import { uid } from '../model.js';
+import {
+  applySchools, makeJoinCode, markSchoolsPushed, markSharedDayTypes, schoolData, schoolPrint, schoolsToPush, unlinkSchool,
+} from './schoolSync.js';
 
 const CloudContext = createContext({ configured: false });
 const SYNC_EVERY_MS = 2 * 60 * 1000;
@@ -12,6 +16,7 @@ const PUSH_DELAY_MS = 1500;
 const CHECK_DELAY_MS = 400;
 
 const hasChanges = (ch) => ch.banks.length + ch.lessons.length + ch.deletes.length > 0;
+const anythingToPush = (state) => hasChanges(changesToPush(state)) || schoolsToPush(state).length > 0;
 
 export function CloudProvider({ children }) {
   const { state, applyRemote, latest, notify } = useStore();
@@ -44,11 +49,16 @@ export function CloudProvider({ children }) {
           await api.pushChanges(ch);
           applyRemote((d) => markPushed(d, ch));
         }
+        const schools = schoolsToPush(latest.current);
+        if (schools.length) {
+          await api.pushSchools(schools);
+          applyRemote((d) => markSchoolsPushed(d, schools));
+        }
         const snap = await api.fetchSnapshot(user.id);
         // Teammates' changes also go into undo history (see applyRemote);
         // skip that work when nothing online changed since the last pull.
         const snapPrint = fingerprint(snap);
-        applyRemote((d) => applySnapshot(d, snap, d.currentUserId), { history: snapPrint !== lastSnap.current });
+        applyRemote((d) => { applySnapshot(d, snap, d.currentUserId); applySchools(d, snap); }, { history: snapPrint !== lastSnap.current });
         lastSnap.current = snapPrint;
       } while (again.current);
       setError(null);
@@ -89,7 +99,7 @@ export function CloudProvider({ children }) {
   const [pending, setPending] = useState(false);
   useEffect(() => {
     if (!user || !state) { setPending(false); return undefined; }
-    const t = setTimeout(() => setPending(hasChanges(changesToPush(latest.current))), CHECK_DELAY_MS);
+    const t = setTimeout(() => setPending(anythingToPush(latest.current)), CHECK_DELAY_MS);
     return () => clearTimeout(t);
   }, [state, user, latest]);
   useEffect(() => {
@@ -152,7 +162,58 @@ export function CloudProvider({ children }) {
     setMemberRole: async (bankId, userId, role) => { await api.setMemberRole(bankId, userId, role); await sync(); },
     removeMember: async (bankId, userId) => { await api.removeMember(bankId, userId); await sync(); },
     cancelInvite: async (bankId, email) => { await api.cancelInvite(bankId, email); await sync(); },
-  }), [user, sync, applyRemote, notify]);
+
+    // ---- school profiles (one per school year)
+    /** Share this year's calendar and bell schedule; the teacher becomes its owner. */
+    createSchool: async (yearId, name) => {
+      applyRemote((d) => markSharedDayTypes(d.years.find((y) => y.id === yearId)));
+      const year = latest.current.years.find((y) => y.id === yearId);
+      const id = uid('school');
+      const row = await api.createSchool({ id, name, data: schoolData(year) }, makeJoinCode);
+      applyRemote((d) => {
+        const y = d.years.find((x) => x.id === yearId);
+        y.school = { id, name: row.name, role: 'owner', joinCode: row.join_code, ownerId: row.owner_id, members: [], seen: true };
+        y.school.shadow = schoolPrint(y);
+      });
+      sync();
+      return row.join_code;
+    },
+    /** Join with a code: this year's school schedule comes from that school from now on. */
+    joinSchool: async (yearId, code) => {
+      const id = await api.joinSchool(code);
+      const other = latest.current.years.find((y) => y.school?.id === id && y.id !== yearId);
+      if (other) throw new Error(`That school is already linked to “${other.name}”.`);
+      applyRemote((d) => { d.years.find((y) => y.id === yearId).school = { id, role: 'member' }; });
+      await sync();
+    },
+    /** Leave (members and admins): the schedule stays as this teacher's own. */
+    leaveSchool: async (yearId) => {
+      const year = latest.current.years.find((y) => y.id === yearId);
+      if (!year.school.revoked) await api.removeSchoolMember(year.school.id, user.id);
+      applyRemote((d) => unlinkSchool(d.years.find((y) => y.id === yearId)));
+    },
+    /** Delete the school online (owner); colleagues keep their copies. */
+    deleteSchool: async (yearId) => {
+      const year = latest.current.years.find((y) => y.id === yearId);
+      await api.deleteSchool(year.school.id);
+      applyRemote((d) => unlinkSchool(d.years.find((y) => y.id === yearId)));
+    },
+    newJoinCode: async (yearId) => {
+      const year = latest.current.years.find((y) => y.id === yearId);
+      await api.setJoinCode(year.school.id, makeJoinCode);
+      await sync();
+    },
+    setSchoolRole: async (yearId, userId, role) => {
+      const year = latest.current.years.find((y) => y.id === yearId);
+      await api.setSchoolRole(year.school.id, userId, role);
+      await sync();
+    },
+    removeSchoolMember: async (yearId, userId) => {
+      const year = latest.current.years.find((y) => y.id === yearId);
+      await api.removeSchoolMember(year.school.id, userId);
+      await sync();
+    },
+  }), [user, sync, applyRemote, notify, latest]);
 
   const value = useMemo(() => ({
     configured: cloudConfigured,

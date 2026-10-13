@@ -22,6 +22,7 @@ const SUPABASE_STUB = `
 const GRANTS = `
   grant usage on schema public to anon, authenticated;
   grant select, insert, update, delete on public.banks, public.bank_members, public.bank_lessons, public.bank_invites to anon, authenticated;
+  grant select, insert, update, delete on public.schools, public.school_members to anon, authenticated;
   grant select on public.profiles to anon, authenticated;
 `;
 
@@ -134,7 +135,7 @@ describe('team lesson banks — row-level security', () => {
   it('does not expose the access-check helpers or trigger functions as API calls', async () => {
     const callable = await as(BEN, `select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
       where n.nspname = 'public' and has_function_privilege(p.oid, 'execute') order by 1`);
-    expect(callable.map((r) => r.proname)).toEqual(['accept_invites', 'invite_to_bank']);
+    expect(callable.map((r) => r.proname)).toEqual(['accept_invites', 'invite_to_bank', 'join_school']);
     expect((await as(null, `select count(*)::int as n from pg_proc p join pg_namespace n on n.oid = p.pronamespace
       where n.nspname in ('public', 'private') and has_function_privilege(p.oid, 'execute')`))[0].n).toBe(0);
   });
@@ -145,5 +146,66 @@ describe('team lesson banks — row-level security', () => {
     await as(BEN, `delete from bank_members where user_id = '${ANA}'`); // no-op: owner isn't a member row
     await as(ANA, `delete from bank_members where user_id = '${BEN}'`);
     expect(await as(BEN, 'select * from banks')).toEqual([]);
+  });
+});
+
+describe('school profiles — row-level security', () => {
+  const CODE = 'ABCD2345';
+  const schoolOf = (id) => as(id, 'select id, name, join_code, data from schools');
+
+  it('keeps a school private until someone joins with its code', async () => {
+    await as(DAN, `insert into schools (id, name, join_code, data) values ('school-1', 'Greene Intermediate', '${CODE}', '{"start":"2026-08-24"}')`);
+    expect((await schoolOf(DAN)).map((r) => r.name)).toEqual(['Greene Intermediate']);
+    expect(await schoolOf(BEN)).toEqual([]);
+    expect(await as(null, 'select * from schools')).toEqual([]);
+    expect(await fails(as(BEN, `insert into schools (id, owner_id, join_code) values ('school-x', '${DAN}', 'ZZZZ2345')`))).toBe(true);
+  });
+
+  it('rejects malformed or duplicate join codes', async () => {
+    expect(await fails(as(BEN, "insert into schools (id, join_code) values ('school-y', 'abc')"))).toBe(true);
+    expect(await fails(as(BEN, `insert into schools (id, join_code) values ('school-z', '${CODE}')`))).toBe(true);
+  });
+
+  it('joins with the code (any case or spacing) and not with a wrong one', async () => {
+    expect(await fails(as(BEN, "select join_school('WRONG234')"))).toBe(true);
+    expect(await fails(as(null, `select join_school('${CODE}')`))).toBe(true);
+    expect((await as(BEN, "select join_school(' abcd-2345 ') as id"))[0].id).toBe('school-1');
+    expect((await schoolOf(BEN)).map((r) => r.join_code)).toEqual([CODE]);
+    expect((await as(BEN, 'select role from school_members where user_id = auth.uid()'))[0].role).toBe('member');
+    expect((await as(DAN, "select join_school('ABCD2345') as id"))[0].id).toBe('school-1'); // owner: no member row
+    expect((await as(DAN, 'select count(*)::int as n from school_members'))[0].n).toBe(1);
+  });
+
+  it('lets members read but not change the schedule or let others in', async () => {
+    await as(BEN, `update schools set data = '{"start":"2030-01-01"}' where id = 'school-1'`);
+    expect((await schoolOf(DAN))[0].data.start).toBe('2026-08-24');
+    expect(await fails(as(BEN, `insert into school_members (school_id, user_id) values ('school-1', '${CLEO}')`))).toBe(true);
+    await as(BEN, "update school_members set role = 'admin' where user_id = auth.uid()");
+    expect((await as(BEN, 'select role from school_members where user_id = auth.uid()'))[0].role).toBe('member');
+    await as(BEN, "delete from schools where id = 'school-1'");
+    expect((await schoolOf(DAN)).length).toBe(1);
+  });
+
+  it('lets the owner make admins, and admins edit the schedule and code', async () => {
+    await as(DAN, `update school_members set role = 'admin' where user_id = '${BEN}'`);
+    await as(BEN, `update schools set data = '{"start":"2026-08-25"}', join_code = 'WXYZ6789' where id = 'school-1'`);
+    const row = (await as(DAN, 'select data, join_code, updated_by from schools'))[0];
+    expect(row).toEqual({ data: { start: '2026-08-25' }, join_code: 'WXYZ6789', updated_by: BEN });
+    expect(await fails(as(BEN, `update schools set owner_id = '${BEN}' where id = 'school-1'`))).toBe(true);
+    await as(BEN, `update school_members set role = 'member' where user_id = '${BEN}'`); // only the owner changes roles
+    expect((await as(DAN, `select role from school_members where user_id = '${BEN}'`))[0].role).toBe('admin');
+  });
+
+  it('shows school colleagues’ names to each other', async () => {
+    expect((await as(DAN, 'select email from profiles order by email')).map((r) => r.email)).toContain('ben@school.org');
+  });
+
+  it('lets members leave and the owner delete the school', async () => {
+    await as(CLEO, "select join_school('WXYZ6789')");
+    await as(CLEO, 'delete from school_members where user_id = auth.uid()');
+    expect(await schoolOf(CLEO)).toEqual([]);
+    await as(DAN, "delete from schools where id = 'school-1'");
+    expect(await schoolOf(BEN)).toEqual([]);
+    expect((await as(DAN, 'select count(*)::int as n from school_members'))[0].n).toBe(0);
   });
 });

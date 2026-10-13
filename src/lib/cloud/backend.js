@@ -71,14 +71,16 @@ export async function fetchAll(makeQuery, pageSize = PAGE) {
 /** Everything this teacher can see (row-level security does the filtering). */
 export async function fetchSnapshot(userId) {
   const db = await supabase();
-  const [banks, lessons, members, profiles, invites] = await Promise.all([
+  const [banks, lessons, members, profiles, invites, schools, schoolMembers] = await Promise.all([
     fetchAll(() => db.from('banks').select('*').order('id')),
     fetchAll(() => db.from('bank_lessons').select('id, bank_id, data, updated_at').order('bank_id').order('id')),
     fetchAll(() => db.from('bank_members').select('bank_id, user_id, role').order('bank_id').order('user_id')),
     fetchAll(() => db.from('profiles').select('id, email, display_name').order('id')),
     fetchAll(() => db.from('bank_invites').select('bank_id, email, role').order('bank_id').order('email')),
+    fetchAll(() => db.from('schools').select('id, owner_id, name, join_code, data, updated_at').order('id')),
+    fetchAll(() => db.from('school_members').select('school_id, user_id, role').order('school_id').order('user_id')),
   ]);
-  return { userId, banks, lessons, members, profiles, invites };
+  return { userId, banks, lessons, members, profiles, invites, schools, schoolMembers };
 }
 
 /** Upload { banks, lessons, deletes } from changesToPush(). */
@@ -117,13 +119,62 @@ export async function cancelInvite(bankId, email) {
   check(await (await supabase()).from('bank_invites').delete().eq('bank_id', bankId).eq('email', email));
 }
 
+// ---- school profiles
+
+const isDuplicate = (err) => err?.code === '23505' || /duplicate key/i.test(String(err?.message));
+
+/** Create a school; makeCode() is asked again if a join code is already taken. */
+export async function createSchool({ id, name, data }, makeCode) {
+  const db = await supabase();
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const joinCode = makeCode();
+    const { data: row, error } = await db.from('schools').insert({ id, name, join_code: joinCode, data }).select('id, owner_id, name, join_code, updated_at').single();
+    if (!error) return row;
+    if (!isDuplicate(error) || /schools_pkey/.test(String(error.message))) throw error;
+  }
+  throw new Error('Couldn’t make a join code. Please try again.');
+}
+
+export async function joinSchool(code) {
+  return check(await (await supabase()).rpc('join_school', { p_code: code }));
+}
+
+/** Upload changed school schedules from schoolsToPush(). */
+export async function pushSchools(list) {
+  const db = await supabase();
+  for (const s of list) check(await db.from('schools').update({ name: s.name, data: s.data }).eq('id', s.id));
+}
+
+export async function setJoinCode(schoolId, makeCode) {
+  const db = await supabase();
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const joinCode = makeCode();
+    const { error } = await db.from('schools').update({ join_code: joinCode }).eq('id', schoolId);
+    if (!error) return joinCode;
+    if (!isDuplicate(error)) throw error;
+  }
+  throw new Error('Couldn’t make a new join code. Please try again.');
+}
+
+export async function deleteSchool(schoolId) {
+  check(await (await supabase()).from('schools').delete().eq('id', schoolId));
+}
+
+export async function setSchoolRole(schoolId, userId, role) {
+  check(await (await supabase()).from('school_members').update({ role }).eq('school_id', schoolId).eq('user_id', userId));
+}
+
+export async function removeSchoolMember(schoolId, userId) {
+  check(await (await supabase()).from('school_members').delete().eq('school_id', schoolId).eq('user_id', userId));
+}
+
 /** Live notifications when a teammate changes something. */
 export function subscribe(onChange) {
   let channel = null; let stopped = false;
   supabase().then((db) => {
     if (stopped) return;
     channel = db.channel('teacher-planner-banks');
-    for (const table of ['banks', 'bank_lessons', 'bank_members']) {
+    for (const table of ['banks', 'bank_lessons', 'bank_members', 'schools', 'school_members']) {
       channel.on('postgres_changes', { event: '*', schema: 'public', table }, onChange);
     }
     channel.subscribe();

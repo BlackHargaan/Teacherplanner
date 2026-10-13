@@ -9,7 +9,7 @@ import { formatTime } from '../lib/dates.js';
  * its period. Class meeting times follow the bell, so a time change here
  * moves every class in that period.
  */
-export default function BellSchedule({ year }) {
+export default function BellSchedule({ year, readOnly = false }) {
   const { state, update } = useStore();
   const classes = yearClasses(state, year.id);
   const periods = year.periods || [];
@@ -18,29 +18,32 @@ export default function BellSchedule({ year }) {
 
   return (
     <div className="stack">
-      {periods.length > 0 && (
-        <table className="table compact bells">
-          <thead><tr><th>Period</th><th>Starts</th><th>Ends</th><th><span className="sr-only">Remove</span></th></tr></thead>
-          <tbody>
-            {periods.map((p) => (
-              <tr key={p.id}>
-                <td><input value={p.name} aria-label="Period name" onChange={(e) => edit((d) => editPeriod(d, year.id, p.id, { name: e.target.value }))} /></td>
-                <td><input type="time" value={p.start} aria-label={`${p.name} starts`} onChange={(e) => edit((d) => editPeriod(d, year.id, p.id, { start: e.target.value }))} /></td>
-                <td><input type="time" value={p.end} aria-label={`${p.name} ends`} onChange={(e) => edit((d) => editPeriod(d, year.id, p.id, { end: e.target.value }))} /></td>
-                <td>
-                  <button className="icon-btn" aria-label={`Remove ${p.name}`} onClick={() => {
-                    if (window.confirm(`Remove “${p.name}”? Classes in it keep their times.`)) edit((d) => removePeriod(d, year.id, p.id));
-                  }}>✕</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      <div className="row">
-        <button onClick={() => edit((d) => { const y = d.years.find((x) => x.id === year.id); y.periods = [...(y.periods || []), nextPeriod(y.periods || [])]; })}>+ Add period</button>
-        <span className="small muted">Include lunch or your planning period if you like; leave them empty below.</span>
-      </div>
+      {/* Periods come from the school when joined as a member; the class grid stays personal. */}
+      <fieldset className="plain-fieldset" disabled={readOnly}>
+        {periods.length > 0 && (
+          <table className="table compact bells">
+            <thead><tr><th>Period</th><th>Starts</th><th>Ends</th><th><span className="sr-only">Remove</span></th></tr></thead>
+            <tbody>
+              {periods.map((p) => (
+                <tr key={p.id}>
+                  <td><input value={p.name} aria-label="Period name" onChange={(e) => edit((d) => editPeriod(d, year.id, p.id, { name: e.target.value }))} /></td>
+                  <td><input type="time" value={p.start} aria-label={`${p.name} starts`} onChange={(e) => edit((d) => editPeriod(d, year.id, p.id, { start: e.target.value }))} /></td>
+                  <td><input type="time" value={p.end} aria-label={`${p.name} ends`} onChange={(e) => edit((d) => editPeriod(d, year.id, p.id, { end: e.target.value }))} /></td>
+                  <td>
+                    <button className="icon-btn" aria-label={`Remove ${p.name}`} onClick={() => {
+                      if (window.confirm(`Remove “${p.name}”? Classes in it keep their times.`)) edit((d) => removePeriod(d, year.id, p.id));
+                    }}>✕</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        <div className="row">
+          <button onClick={() => edit((d) => { const y = d.years.find((x) => x.id === year.id); y.periods = [...(y.periods || []), nextPeriod(y.periods || [])]; })}>+ Add period</button>
+          <span className="small muted">Include lunch or your planning period if you like; leave them empty below.</span>
+        </div>
+      </fieldset>
 
       {periods.length > 0 && classes.length > 0 && (
         <>

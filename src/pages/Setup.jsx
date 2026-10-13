@@ -8,6 +8,8 @@ import { Field, Modal, Empty } from '../components/ui.jsx';
 import YearCalendar from '../components/YearCalendar.jsx';
 import BellSchedule from '../components/BellSchedule.jsx';
 import CalendarImport from '../components/CalendarImport.jsx';
+import SchoolProfile from '../components/SchoolProfile.jsx';
+import { canEditSchool, schoolReadOnly } from '../lib/cloud/schoolSync.js';
 
 export default function Setup() {
   const { state, update, year, notify } = useStore();
@@ -17,6 +19,8 @@ export default function Setup() {
   const editYear = (fn) => update((d) => fn(d.years.find((y) => y.id === year.id)));
   const days = schoolDays(year);
   const classes = yearClasses(state, year.id);
+  // Joined a school as a member: its shared schedule is read-only here.
+  const readOnly = schoolReadOnly(year);
   const firstDayName = `${year.cycleNames === 'letters' ? 'an' : 'a'} ${dayKeyLabel('C1', year)}`;
 
   return (
@@ -33,178 +37,190 @@ export default function Setup() {
       </div>
 
       <div className="cards">
+        <SchoolProfile year={year} />
+
         <section className="card">
           <h2>Calendar</h2>
           <Field label="Name"><input value={year.name} onChange={(e) => setYear({ name: e.target.value })} /></Field>
-          <div className="row">
-            <Field label="First day"><input type="date" value={year.start} onChange={(e) => setYear({ start: e.target.value })} /></Field>
-            <Field label="Last day"><input type="date" value={year.end} onChange={(e) => setYear({ end: e.target.value })} /></Field>
-          </div>
-          <Field label="School days of the week">
+          <fieldset className="plain-fieldset" disabled={readOnly}>
+              <div className="row">
+                <Field label="First day"><input type="date" value={year.start} onChange={(e) => setYear({ start: e.target.value })} /></Field>
+                <Field label="Last day"><input type="date" value={year.end} onChange={(e) => setYear({ end: e.target.value })} /></Field>
+              </div>
+              <Field label="School days of the week">
+                <div className="row wrap">
+                  {[1, 2, 3, 4, 5, 6, 0].map((d) => (
+                    <label key={d} className="row small">
+                      <input type="checkbox" checked={year.weekdays.includes(d)} onChange={() => setYear({ weekdays: year.weekdays.includes(d) ? year.weekdays.filter((x) => x !== d) : [...year.weekdays, d] })} />
+                      {DOW_SHORT[d]}
+                    </label>
+                  ))}
+                </div>
+              </Field>
+              <Field label="Schedule type">
+                <select value={year.scheduleType} onChange={(e) => setYear({ scheduleType: e.target.value })}>
+                  {Object.entries(SCHEDULE_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                </select>
+              </Field>
+              {year.scheduleType === 'cycle' && (
+                <div className="row">
+                  <Field label="Days in cycle"><input type="number" min="2" max="20" value={year.cycleLength} onChange={(e) => setYear({ cycleLength: Number(e.target.value) })} /></Field>
+                  <Field label="First day of year is"><select value={year.cycleStartDay} onChange={(e) => setYear({ cycleStartDay: Number(e.target.value) })}>
+                    {Array.from({ length: year.cycleLength }, (_, i) => <option key={i} value={i + 1}>{dayKeyLabel(`C${i + 1}`, year)}</option>)}
+                  </select></Field>
+                </div>
+              )}
+              {year.scheduleType === 'cycle' && (
+                <>
+                  <Field label="Call the days">
+                    <select value={year.cycleNames || 'numbers'} onChange={(e) => setYear({ cycleNames: e.target.value })}>
+                      {Object.entries(CYCLE_NAMES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="When a school day is cancelled (snow day, emergency)" hint={(year.cancelledDayRotation || 'keep') === 'keep'
+                    ? `If ${firstDayName} is cancelled, the next day is still the day it was going to be.`
+                    : `If ${firstDayName} is cancelled, the next school day becomes the ${dayKeyLabel('C1', year)}, and later days shift.`}>
+                    <select value={year.cancelledDayRotation || 'keep'} onChange={(e) => setYear({ cancelledDayRotation: e.target.value })}>
+                      {Object.entries(CANCELLED_ROTATION).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                    </select>
+                  </Field>
+                </>
+              )}
+              {year.scheduleType === 'biweekly' && <p className="small muted">The week containing the first day is an “A” week; weeks alternate after that.</p>}
+              <p className="small muted">{days.length} school days. Set each class’s meeting times on the <a href="#/classes">Classes</a> page.</p>
+            </fieldset>
+          </section>
+
+          <GradingPeriods year={year} editYear={editYear} readOnly={readOnly} />
+
+          <section className="card wide">
             <div className="row wrap">
-              {[1, 2, 3, 4, 5, 6, 0].map((d) => (
-                <label key={d} className="row small">
-                  <input type="checkbox" checked={year.weekdays.includes(d)} onChange={() => setYear({ weekdays: year.weekdays.includes(d) ? year.weekdays.filter((x) => x !== d) : [...year.weekdays, d] })} />
-                  {DOW_SHORT[d]}
-                </label>
+              <h2 className="grow">Year calendar</h2>
+              {!readOnly && <button onClick={() => setImporting(true)}>{year.calendarSource ? 'Update from district calendar…' : 'Import district calendar…'}</button>}
+            </div>
+            <p className="small muted">
+              Mark breaks, workdays and special schedules from your district calendar, or import it from a calendar link or .ics file. Lessons move automatically when days change.
+              {year.calendarSource && ` Last imported ${formatDate(year.calendarSource.importedAt.slice(0, 10))}.`}
+            </p>
+            <YearCalendar year={year} editYear={editYear} readOnly={readOnly} />
+            <fieldset className="plain-fieldset" disabled={readOnly}><NonSchoolDays year={year} editYear={editYear} /></fieldset>
+          </section>
+
+          <section className="card wide">
+            <h2>Bell schedule</h2>
+            <p className="small muted">Enter your school’s periods once, then put each class in its period.</p>
+            <BellSchedule year={year} readOnly={readOnly} />
+          </section>
+
+          <section className="card wide">
+            <h2>Alternate day schedules</h2>
+            <p className="small muted">Define special days — half days, assemblies, planning days — with their own class times. Assign them to dates here or from the day menu in the planner.</p>
+            <DayTypes year={year} editYear={editYear} classes={classes} readOnly={readOnly} />
+          </section>
+
+          <section className="card wide">
+            <h2>Daily changes</h2>
+            <p className="small muted">Extra classes and classes removed from individual days (managed from the planner).</p>
+            {(year.overrides || []).length === 0 ? <Empty>None yet.</Empty> : (
+              <table className="table">
+                <tbody>
+                  {[...year.overrides].sort((a, b) => a.date.localeCompare(b.date)).map((o) => (
+                    <tr key={o.id}>
+                      <td>{formatDate(o.date)}</td>
+                      <td>{classes.find((c) => c.id === o.classId)?.name}</td>
+                      <td>{o.type === 'add' ? `Extra class ${o.start}–${o.end}` : 'Removed'}</td>
+                      <td><button className="icon-btn" onClick={() => editYear((y) => { y.overrides = y.overrides.filter((x) => x.id !== o.id); })}>✕</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </section>
+        </div>
+
+        {importing && <CalendarImport year={year} onClose={() => setImporting(false)} />}
+        {rollover && <RolloverDialog onClose={() => setRollover(false)} onDone={() => notify('New year created from last year’s schedule and lessons')} />}
+      </div>
+    );
+  }
+
+  function NonSchoolDays({ year, editYear }) {
+    const list = [...(year.nonSchoolDays || [])].sort((a, b) => a.start.localeCompare(b.start));
+    if (!list.length) return null;
+    const find = (y, r) => y.nonSchoolDays.find((x) => x.start === r.start && x.label === r.label);
+    return (
+      <details className="nsd-list">
+        <summary>Days without classes ({list.length})</summary>
+        <ul className="list">
+          {/* Keyed by date, not name, so typing a new name doesn't rebuild the row and lose focus. */}
+          {list.map((r, i) => (
+            <li key={`${r.start}-${i}`}>
+              <span className="nowrap">{formatDate(r.start)}{r.end && r.end !== r.start ? ` – ${formatDate(r.end)}` : ''}</span>
+              <input className="grow" aria-label="Name" value={r.label} onChange={(e) => editYear((y) => { find(y, r).label = e.target.value; })} />
+              <select aria-label="Kind" value={r.kind || 'holiday'} onChange={(e) => editYear((y) => { const x = find(y, r); if (e.target.value === 'holiday') delete x.kind; else x.kind = e.target.value; })}>
+                {Object.entries(NON_SCHOOL_KINDS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </select>
+              <button className="icon-btn" aria-label={`Remove ${r.label}`} onClick={() => editYear((y) => { y.nonSchoolDays = y.nonSchoolDays.filter((x) => x !== find(y, r)); })}>✕</button>
+            </li>
+          ))}
+        </ul>
+      </details>
+    );
+  }
+
+  const TERM_SPLITS = [['Quarters', 4, 'Quarter'], ['Trimesters', 3, 'Trimester'], ['Semesters', 2, 'Semester']];
+
+  function GradingPeriods({ year, editYear, readOnly }) {
+    const list = year.gradingPeriods || [];
+    const fill = (count, name) => {
+      if (list.length && !window.confirm('Replace your grading periods?')) return;
+      editYear((y) => { y.gradingPeriods = splitGradingPeriods(y, count, name).map((g) => ({ id: uid('term'), ...g })); });
+    };
+    const edit = (id, patch) => editYear((y) => Object.assign(y.gradingPeriods.find((g) => g.id === id), patch));
+    return (
+      <section className="card">
+        <h2>Grading periods</h2>
+        <fieldset className="plain-fieldset" disabled={readOnly}>
+        <div className="row wrap">
+          {TERM_SPLITS.map(([label, n, name]) => <button key={label} onClick={() => fill(n, name)}>{label}</button>)}
+          <button onClick={() => editYear((y) => { y.gradingPeriods = [...(y.gradingPeriods || []), { id: uid('term'), name: `Term ${list.length + 1}`, start: list.length ? addDays(list.at(-1).end, 1) : y.start, end: y.end }]; })}>+ Add</button>
+        </div>
+        {list.length === 0 ? <p className="small muted">Split the year evenly, then adjust the dates to match your district calendar.</p> : (
+          <table className="table compact">
+            <thead><tr><th>Name</th><th>Starts</th><th>Ends</th><th><span className="sr-only">Remove</span></th></tr></thead>
+            <tbody>
+              {list.map((g) => (
+                <tr key={g.id}>
+                  <td><input value={g.name} aria-label="Name" onChange={(e) => edit(g.id, { name: e.target.value })} /></td>
+                  <td><input type="date" value={g.start} aria-label={`${g.name} starts`} onChange={(e) => edit(g.id, { start: e.target.value })} /></td>
+                  <td><input type="date" value={g.end} aria-label={`${g.name} ends`} onChange={(e) => edit(g.id, { end: e.target.value })} /></td>
+                  <td><button className="icon-btn" aria-label={`Remove ${g.name}`} onClick={() => editYear((y) => { y.gradingPeriods = y.gradingPeriods.filter((x) => x.id !== g.id); })}>✕</button></td>
+                </tr>
               ))}
-            </div>
-          </Field>
-          <Field label="Schedule type">
-            <select value={year.scheduleType} onChange={(e) => setYear({ scheduleType: e.target.value })}>
-              {Object.entries(SCHEDULE_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-            </select>
-          </Field>
-          {year.scheduleType === 'cycle' && (
-            <div className="row">
-              <Field label="Days in cycle"><input type="number" min="2" max="20" value={year.cycleLength} onChange={(e) => setYear({ cycleLength: Number(e.target.value) })} /></Field>
-              <Field label="First day of year is"><select value={year.cycleStartDay} onChange={(e) => setYear({ cycleStartDay: Number(e.target.value) })}>
-                {Array.from({ length: year.cycleLength }, (_, i) => <option key={i} value={i + 1}>{dayKeyLabel(`C${i + 1}`, year)}</option>)}
-              </select></Field>
-            </div>
-          )}
-          {year.scheduleType === 'cycle' && (
-            <>
-              <Field label="Call the days">
-                <select value={year.cycleNames || 'numbers'} onChange={(e) => setYear({ cycleNames: e.target.value })}>
-                  {Object.entries(CYCLE_NAMES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                </select>
-              </Field>
-              <Field label="When a school day is cancelled (snow day, emergency)" hint={(year.cancelledDayRotation || 'keep') === 'keep'
-                ? `If ${firstDayName} is cancelled, the next day is still the day it was going to be.`
-                : `If ${firstDayName} is cancelled, the next school day becomes the ${dayKeyLabel('C1', year)}, and later days shift.`}>
-                <select value={year.cancelledDayRotation || 'keep'} onChange={(e) => setYear({ cancelledDayRotation: e.target.value })}>
-                  {Object.entries(CANCELLED_ROTATION).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                </select>
-              </Field>
-            </>
-          )}
-          {year.scheduleType === 'biweekly' && <p className="small muted">The week containing the first day is an “A” week; weeks alternate after that.</p>}
-          <p className="small muted">{days.length} school days. Set each class’s meeting times on the <a href="#/classes">Classes</a> page.</p>
-        </section>
-
-        <GradingPeriods year={year} editYear={editYear} />
-
-        <section className="card wide">
-          <div className="row wrap">
-            <h2 className="grow">Year calendar</h2>
-            <button onClick={() => setImporting(true)}>{year.calendarSource ? 'Update from district calendar…' : 'Import district calendar…'}</button>
-          </div>
-          <p className="small muted">
-            Mark breaks, workdays and special schedules from your district calendar, or import it from a calendar link or .ics file. Lessons move automatically when days change.
-            {year.calendarSource && ` Last imported ${formatDate(year.calendarSource.importedAt.slice(0, 10))}.`}
-          </p>
-          <YearCalendar year={year} editYear={editYear} />
-          <NonSchoolDays year={year} editYear={editYear} />
-        </section>
-
-        <section className="card wide">
-          <h2>Bell schedule</h2>
-          <p className="small muted">Enter your school’s periods once, then put each class in its period.</p>
-          <BellSchedule year={year} />
-        </section>
-
-        <section className="card wide">
-          <h2>Alternate day schedules</h2>
-          <p className="small muted">Define special days — half days, assemblies, planning days — with their own class times. Assign them to dates here or from the day menu in the planner.</p>
-          <DayTypes year={year} editYear={editYear} classes={classes} />
-        </section>
-
-        <section className="card wide">
-          <h2>Daily changes</h2>
-          <p className="small muted">Extra classes and classes removed from individual days (managed from the planner).</p>
-          {(year.overrides || []).length === 0 ? <Empty>None yet.</Empty> : (
-            <table className="table">
-              <tbody>
-                {[...year.overrides].sort((a, b) => a.date.localeCompare(b.date)).map((o) => (
-                  <tr key={o.id}>
-                    <td>{formatDate(o.date)}</td>
-                    <td>{classes.find((c) => c.id === o.classId)?.name}</td>
-                    <td>{o.type === 'add' ? `Extra class ${o.start}–${o.end}` : 'Removed'}</td>
-                    <td><button className="icon-btn" onClick={() => editYear((y) => { y.overrides = y.overrides.filter((x) => x.id !== o.id); })}>✕</button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </section>
-      </div>
-
-      {importing && <CalendarImport year={year} onClose={() => setImporting(false)} />}
-      {rollover && <RolloverDialog onClose={() => setRollover(false)} onDone={() => notify('New year created from last year’s schedule and lessons')} />}
-    </div>
-  );
-}
-
-function NonSchoolDays({ year, editYear }) {
-  const list = [...(year.nonSchoolDays || [])].sort((a, b) => a.start.localeCompare(b.start));
-  if (!list.length) return null;
-  const find = (y, r) => y.nonSchoolDays.find((x) => x.start === r.start && x.label === r.label);
-  return (
-    <details className="nsd-list">
-      <summary>Days without classes ({list.length})</summary>
-      <ul className="list">
-        {/* Keyed by date, not name, so typing a new name doesn't rebuild the row and lose focus. */}
-        {list.map((r, i) => (
-          <li key={`${r.start}-${i}`}>
-            <span className="nowrap">{formatDate(r.start)}{r.end && r.end !== r.start ? ` – ${formatDate(r.end)}` : ''}</span>
-            <input className="grow" aria-label="Name" value={r.label} onChange={(e) => editYear((y) => { find(y, r).label = e.target.value; })} />
-            <select aria-label="Kind" value={r.kind || 'holiday'} onChange={(e) => editYear((y) => { const x = find(y, r); if (e.target.value === 'holiday') delete x.kind; else x.kind = e.target.value; })}>
-              {Object.entries(NON_SCHOOL_KINDS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-            </select>
-            <button className="icon-btn" aria-label={`Remove ${r.label}`} onClick={() => editYear((y) => { y.nonSchoolDays = y.nonSchoolDays.filter((x) => x !== find(y, r)); })}>✕</button>
-          </li>
-        ))}
-      </ul>
-    </details>
-  );
-}
-
-const TERM_SPLITS = [['Quarters', 4, 'Quarter'], ['Trimesters', 3, 'Trimester'], ['Semesters', 2, 'Semester']];
-
-function GradingPeriods({ year, editYear }) {
-  const list = year.gradingPeriods || [];
-  const fill = (count, name) => {
-    if (list.length && !window.confirm('Replace your grading periods?')) return;
-    editYear((y) => { y.gradingPeriods = splitGradingPeriods(y, count, name).map((g) => ({ id: uid('term'), ...g })); });
-  };
-  const edit = (id, patch) => editYear((y) => Object.assign(y.gradingPeriods.find((g) => g.id === id), patch));
-  return (
-    <section className="card">
-      <h2>Grading periods</h2>
-      <div className="row wrap">
-        {TERM_SPLITS.map(([label, n, name]) => <button key={label} onClick={() => fill(n, name)}>{label}</button>)}
-        <button onClick={() => editYear((y) => { y.gradingPeriods = [...(y.gradingPeriods || []), { id: uid('term'), name: `Term ${list.length + 1}`, start: list.length ? addDays(list.at(-1).end, 1) : y.start, end: y.end }]; })}>+ Add</button>
-      </div>
-      {list.length === 0 ? <p className="small muted">Split the year evenly, then adjust the dates to match your district calendar.</p> : (
-        <table className="table compact">
-          <thead><tr><th>Name</th><th>Starts</th><th>Ends</th><th><span className="sr-only">Remove</span></th></tr></thead>
-          <tbody>
-            {list.map((g) => (
-              <tr key={g.id}>
-                <td><input value={g.name} aria-label="Name" onChange={(e) => edit(g.id, { name: e.target.value })} /></td>
-                <td><input type="date" value={g.start} aria-label={`${g.name} starts`} onChange={(e) => edit(g.id, { start: e.target.value })} /></td>
-                <td><input type="date" value={g.end} aria-label={`${g.name} ends`} onChange={(e) => edit(g.id, { end: e.target.value })} /></td>
-                <td><button className="icon-btn" aria-label={`Remove ${g.name}`} onClick={() => editYear((y) => { y.gradingPeriods = y.gradingPeriods.filter((x) => x.id !== g.id); })}>✕</button></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+            </tbody>
+          </table>
+        )}
+      </fieldset>
     </section>
   );
 }
 
-function DayTypes({ year, editYear, classes }) {
+function DayTypes({ year, editYear, classes, readOnly }) {
+  const sharing = canEditSchool(year);
   const [assignDate, setAssignDate] = useState({});
   const types = year.dayTypes || [];
   const assignments = Object.entries(year.dayAssignments || {});
   return (
     <>
       {types.map((t) => (
-        <div key={t.id} className="subcard">
-          <div className="row">
-            <input value={t.name} onChange={(e) => editYear((y) => { y.dayTypes.find((x) => x.id === t.id).name = e.target.value; })} />
+        // The school's early-release schedules are read-only for members.
+        <fieldset key={t.id} className="subcard" disabled={readOnly && t.school}>
+          <div className="row wrap">
+            <input value={t.name} aria-label="Schedule name" onChange={(e) => editYear((y) => { y.dayTypes.find((x) => x.id === t.id).name = e.target.value; })} />
+            {t.school && <span className="badge">{sharing ? 'Shared with your school' : 'From your school'}</span>}
+            {sharing && t.periodTimes && !t.school && (
+              <label className="row small"><input type="checkbox" checked={false} onChange={() => editYear((y) => { y.dayTypes.find((x) => x.id === t.id).school = true; })} /> Share with my school</label>
+            )}
             {year.scheduleType === 'cycle' && (
               <label className="row small"><input type="checkbox" checked={t.countsInRotation !== false} onChange={(e) => editYear((y) => { y.dayTypes.find((x) => x.id === t.id).countsInRotation = e.target.checked; })} /> Counts as a cycle day</label>
             )}
@@ -278,7 +294,7 @@ function DayTypes({ year, editYear, classes }) {
               <span key={d} className="chip">{formatDate(d)}<button className="chip-x" onClick={() => editYear((y) => { delete y.dayAssignments[d]; })}>×</button></span>
             ))}
           </div>
-        </div>
+        </fieldset>
       ))}
       <button onClick={() => editYear((y) => {
         const fresh = { id: uid('day'), name: 'Early Release', countsInRotation: true, slots: [] };

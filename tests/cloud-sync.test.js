@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applySnapshot, changesToPush, markPushed, toCloudLesson, detachBank } from '../src/lib/cloud/sync.js';
+import { applySnapshot, changesByBank, changesToPush, markPushed, toCloudLesson, detachBank } from '../src/lib/cloud/sync.js';
 import { demoState, makeBank, makeLesson } from '../src/lib/model.js';
 
 /** A tiny stand-in for the database (permissions are tested separately in rls.test.js). */
@@ -209,5 +209,42 @@ describe('reading online data', () => {
     const exact = await fetchAll(() => ({ range: async (from, to) => ({ data: rows.slice(0, 2000).slice(from, to + 1), error: null }) }));
     expect(exact).toHaveLength(2000);
     await expect(fetchAll(() => ({ range: async () => ({ data: null, error: new Error('nope') }) }))).rejects.toThrow('nope');
+  });
+});
+
+describe('online team banks — sync order and access changes', () => {
+  it('groups uploads per bank and knows which banks are new', () => {
+    const { ana } = setup();
+    const fresh = makeBank({ id: 'bank-new', ownerId: ana.currentUserId, name: 'New' });
+    fresh.cloud = { role: 'owner', members: [], invites: [] };
+    ana.banks.push(fresh);
+    ana.lessons['les-1'].title = 'Cells!';
+    const groups = changesByBank(ana, changesToPush(ana)).sort((a, b) => a.bankId.localeCompare(b.bankId));
+    expect(groups.map((g) => [g.bankId, g.isNew, g.banks.length, g.lessons.length])).toEqual([['bank-new', true, 1, 0], ['bank-team', false, 0, 1]]);
+  });
+
+  it('a view-only copy edited locally (e.g. a tag removed) still gets the owner’s updates', () => {
+    const { server, ana, ben } = setup();
+    server.members[0].role = 'view';
+    applySnapshot(ben, server.snapshot('ben'), ben.currentUserId);
+    ben.lessons['les-1'].statusIds = ['something-else'];
+    expect(changesToPush(ben).lessons).toEqual([]);
+    ana.lessons['les-1'].title = 'Cells v2';
+    sync(server, ana, 'ana');
+    applySnapshot(ben, server.snapshot('ben'), ben.currentUserId);
+    expect(ben.lessons['les-1'].title).toBe('Cells v2');
+  });
+
+  it('signing in as another account keeps the old banks read-only and never uploads them', () => {
+    const { server, ana } = setup();
+    ana.lessons['les-1'].title = 'unsent edit';
+    applySnapshot(ana, server.snapshot('someone-else'), ana.currentUserId);
+    const bank = ana.banks.find((b) => b.id === 'bank-team');
+    expect(bank.cloud.revoked).toBe(true);
+    expect(changesToPush(ana)).toEqual({ banks: [], lessons: [], deletes: [] });
+    // back on the right account, the bank is followed again
+    applySnapshot(ana, server.snapshot('ana'), ana.currentUserId);
+    expect(bank.cloud.revoked).toBeUndefined();
+    expect(bank.cloud.role).toBe('owner');
   });
 });

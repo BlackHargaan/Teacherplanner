@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  CODE_ALPHABET, applySchoolData, applySchools, canEditSchool, formatJoinCode, makeJoinCode, markSchoolsPushed, markSharedDayTypes,
-  schoolData, schoolDirty, schoolReadOnly, schoolsToPush,
+  CODE_ALPHABET, applySchoolData, applySchools, canEditSchool, forgetSchools, formatJoinCode, makeJoinCode, markSchoolsPushed,
+  markSharedDayTypes, mergeSchool, schoolData, schoolDirty, schoolPayload, schoolReadOnly, schoolsToPush,
 } from '../src/lib/cloud/schoolSync.js';
 import { rolloverYear } from '../src/lib/model.js';
 
@@ -120,6 +120,72 @@ describe('syncing schools', () => {
     applySchools(d, snapshot('ben', schoolData(adminYear()), [{ school_id: 's1', user_id: 'ben', role: 'admin' }]));
     expect(d.years[0].school.role).toBe('admin');
     expect(canEditSchool(d.years[0])).toBe(true);
+  });
+});
+
+describe('syncing schools — review fixes', () => {
+  const row = (data, extra = {}) => ({ id: 's1', name: 'Greene Intermediate', owner_id: 'ana', join_code: 'ABCD2345', data, updated_at: 'v1', ...extra });
+  const snap = (userId, data, extra, members = [{ school_id: 's1', user_id: 'ben', role: 'admin' }]) => ({
+    userId, schools: [row(data, extra)], schoolMembers: members, profiles: [],
+  });
+  const linked = (userId, data) => {
+    const d = { years: [{ ...adminYear(), school: { id: 's1', role: 'member' } }], classes: [] };
+    applySchools(d, snap(userId, data));
+    return d;
+  };
+
+  it('two admins editing at once: each keeps the fields they changed', () => {
+    const start = (() => { const y = adminYear(); markSharedDayTypes(y); return schoolData(y); })();
+    const ana = linked('ana', start);
+    const ben = linked('ben', start);
+    // Ana adds a break; Ben changes 2nd period. Ben uploads first.
+    ana.years[0].nonSchoolDays.push({ start: '2026-11-25', end: '2026-11-27', label: 'Thanksgiving' });
+    ben.years[0].periods[1].end = '09:55';
+    const fromBen = schoolsToPush(ben);
+    expect(fromBen[0].expected).toBe('v1');
+    // the server only accepts an upload based on its current version
+    markSchoolsPushed(ben, [{ ...fromBen[0], updatedAt: 'v2' }]);
+    expect(ben.years[0].school.updatedAt).toBe('v2');
+    // Ana's upload (based on v1) is refused; her next download merges
+    const server = schoolPayload(ben.years[0]).data;
+    applySchools(ana, snap('ana', server, { updated_at: 'v2' }));
+    const y = ana.years[0];
+    expect(y.periods[1].end).toBe('09:55');
+    expect(y.nonSchoolDays.map((r) => r.label)).toContain('Thanksgiving');
+    const again = schoolsToPush(ana);
+    expect(again).toHaveLength(1);
+    expect(again[0].expected).toBe('v2');
+    expect(again[0].data.periods[1].end).toBe('09:55');
+  });
+
+  it('mergeSchool keeps local changes and takes the rest from the server', () => {
+    const base = { name: 'A', data: { start: '1', end: '2' } };
+    expect(mergeSchool(base, { name: 'A', data: { start: '9', end: '2' } }, { name: 'B', data: { start: '1', end: '7' } }))
+      .toMatchObject({ name: 'B', data: { start: '9', end: '7' } });
+  });
+
+  it('a school just created is not taken for deleted by a download that started earlier', () => {
+    const d = { years: [{ ...adminYear(), school: { id: 's1', role: 'owner', shadow: 'x' } }], classes: [] };
+    applySchools(d, { userId: 'ana', schools: [], schoolMembers: [], profiles: [] });
+    expect(d.years[0].school.revoked).toBeUndefined();
+  });
+
+  it('after switching accounts, schools stop updating, and come back for the right account', () => {
+    const d = linked('ben', schoolData(adminYear()));
+    forgetSchools(d);
+    expect(d.years[0].school.revoked).toBe(true);
+    expect(schoolsToPush(d)).toEqual([]);
+    applySchools(d, snap('ben', schoolData(adminYear())));
+    expect(d.years[0].school.revoked).toBeUndefined();
+    expect(d.years[0].school.role).toBe('admin');
+  });
+
+  it('joining keeps the teacher’s own early release times on the school’s periods', () => {
+    const mine = { ...adminYear(), periods: [{ id: 'm1', name: '1st Period', start: '08:00', end: '08:50' }] };
+    mine.dayTypes = [{ id: 'own-early', name: 'My early release', periodTimes: { m1: { start: '08:00', end: '08:20' } }, slots: [] }];
+    const remote = { periods: [{ id: 'p1', name: '1st period', start: '08:00', end: '08:50' }], dayTypes: [] };
+    applySchoolData(mine, remote, []);
+    expect(mine.dayTypes[0].periodTimes).toEqual({ p1: { start: '08:00', end: '08:20' } });
   });
 });
 

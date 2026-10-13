@@ -1,6 +1,7 @@
 // Sync between the local planner and online team lesson banks.
 //
 import { releaseBankLessons } from '../actions.js';
+import { forgetSchools } from './schoolSync.js';
 
 // Pure functions only (no network): the CloudProvider calls these with what
 // it fetched. Model:
@@ -55,7 +56,7 @@ export function toCloudLesson(lesson) {
 export const bankLessons = (state, bankId) =>
   Object.values(state.lessons).filter((l) => l.homeType === 'bank' && l.homeId === bankId);
 
-const pushable = (bank) => bank.cloud && !bank.cloud.revoked && ['owner', 'edit'].includes(bank.cloud.role);
+export const pushable = (bank) => Boolean(bank.cloud && !bank.cloud.revoked && ['owner', 'edit'].includes(bank.cloud.role));
 
 /**
  * What needs uploading: banks and lessons whose local fingerprint differs
@@ -81,6 +82,24 @@ export function changesToPush(state) {
   return out;
 }
 
+/**
+ * The same changes, one group per bank, so a bank that can't be uploaded
+ * (access removed, deleted online) doesn't hold up the others. isNew: the
+ * bank has never been online, so it's created rather than updated.
+ */
+export function changesByBank(state, ch) {
+  const shadow = state.cloud?.shadow || {};
+  const groups = new Map();
+  const group = (bankId) => {
+    if (!groups.has(bankId)) groups.set(bankId, { bankId, isNew: shadow[bankKey(bankId)] === undefined, banks: [], lessons: [], deletes: [] });
+    return groups.get(bankId);
+  };
+  for (const row of ch.banks) group(row.id).banks.push(row);
+  for (const row of ch.lessons) group(row.bank_id).lessons.push(row);
+  for (const row of ch.deletes) group(row.bank_id).deletes.push(row);
+  return [...groups.values()];
+}
+
 /** After a successful push, record what was sent as the new synced state. */
 export function markPushed(d, pushed) {
   d.cloud ||= {};
@@ -99,12 +118,19 @@ const personName = (p) => p?.display_name || p?.email || 'A teacher';
  */
 export function applySnapshot(d, snapshot, localUserId) {
   d.cloud ||= {};
-  if (d.cloud.userId && d.cloud.userId !== snapshot.userId) d.cloud.shadow = {}; // different account
+  if (d.cloud.userId && d.cloud.userId !== snapshot.userId) {
+    // Signed in as someone else: what the previous account shared stays here
+    // read-only (and is never uploaded under this account) unless this
+    // account can see it too, in which case it's picked up again below.
+    forgetBanks(d, localUserId);
+    forgetSchools(d);
+    d.cloud.shadow = {};
+  }
   d.cloud.userId = snapshot.userId;
   d.cloud.shadow ||= {};
   const shadow = d.cloud.shadow;
   const profiles = Object.fromEntries((snapshot.profiles || []).map((p) => [p.id, p]));
-  const isDirty = (key, value) => shadow[key] !== undefined && shadow[key] !== fingerprint(value);
+  const changed = (key, value) => shadow[key] !== undefined && shadow[key] !== fingerprint(value);
   const seen = new Set();
 
   for (const row of snapshot.banks) {
@@ -117,6 +143,11 @@ export function applySnapshot(d, snapshot, localUserId) {
       bank = { id: row.id, name: row.name, color: row.color, sections: [], sequence: [], sharing: {}, sectionPermissions: {} };
       d.banks.push(bank);
     }
+    // Local changes are kept until uploaded, but only in banks this teacher
+    // can upload to; anything else (e.g. a tag removed from a bank they only
+    // view) is replaced by the online version.
+    const canPush = role === 'owner' || role === 'edit';
+    const isDirty = (key, value) => canPush && changed(key, value);
     const bk = bankKey(row.id);
     if (!isDirty(bk, toCloudBank(bank)) || !bank.cloud) {
       Object.assign(bank, { name: row.name, color: row.color, sections: row.sections || [], sequence: row.sequence || [] });
@@ -171,13 +202,20 @@ export function applySnapshot(d, snapshot, localUserId) {
   // banks that were online before count; one shared a moment ago may simply
   // not be in this snapshot yet.
   for (const bank of d.banks) {
-    if (bank.cloud && !bank.cloud.revoked && !seen.has(bank.id) && shadow[bankKey(bank.id)] !== undefined) {
-      bank.cloud = { ...bank.cloud, revoked: true, role: 'view' };
-      if (bank.ownerId === localUserId) bank.ownerId = 'cloud:gone';
-      bank.sharing = { [localUserId]: 'view' };
-    }
+    if (bank.cloud && !bank.cloud.revoked && !seen.has(bank.id) && shadow[bankKey(bank.id)] !== undefined) revokeBank(bank, localUserId);
   }
   d.cloud.lastSync = Date.now();
+}
+
+function revokeBank(bank, localUserId) {
+  bank.cloud = { ...bank.cloud, revoked: true, role: 'view' };
+  if (bank.ownerId === localUserId) bank.ownerId = 'cloud:gone';
+  bank.sharing = { [localUserId]: 'view' };
+}
+
+/** Every online bank becomes a read-only local copy (account changed). */
+function forgetBanks(d, localUserId) {
+  for (const bank of d.banks) if (bank.cloud && !bank.cloud.revoked) revokeBank(bank, localUserId);
 }
 
 /** Stop syncing a bank: it becomes an ordinary local bank again. */

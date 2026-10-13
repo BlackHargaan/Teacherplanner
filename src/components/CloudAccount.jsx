@@ -132,7 +132,7 @@ export function AccountCard() {
 export function CloudStatus() {
   const cloud = useCloud();
   if (!cloud.configured) return null;
-  const label = cloud.user ? (cloud.pending && cloud.status !== 'offline' ? 'Saving…' : STATUS_TEXT[cloud.status]) : 'Sign in';
+  const label = cloud.user ? (cloud.pending && !['offline', 'error'].includes(cloud.status) ? 'Saving…' : STATUS_TEXT[cloud.status]) : 'Sign in';
   return (
     <a className={`cloud-pill sync-${cloud.user ? cloud.status : 'signed-out'}`} href="#/settings/account" title={cloud.user ? `Online sharing: ${STATUS_TEXT[cloud.status]}` : 'Sign in to share lesson banks with your team'}>
       <span aria-hidden="true">☁</span> {cloud.user ? (cloud.status === 'synced' && !cloud.pending ? 'Synced' : label) : 'Sign in'}

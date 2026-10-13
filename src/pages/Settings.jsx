@@ -117,7 +117,12 @@ export default function Settings() {
               <input value={s.name} onChange={(e) => update((d) => { d.statuses[i].name = e.target.value; })} className="grow" />
               <button className="icon-btn" onClick={() => update((d) => {
                 d.statuses.splice(i, 1);
-                for (const l of Object.values(d.lessons)) l.statusIds = l.statusIds.filter((x) => x !== s.id);
+                // Lessons in online banks belong to the team too: leave their tags alone.
+                const online = new Set(d.banks.filter((b) => b.cloud).map((b) => b.id));
+                for (const l of Object.values(d.lessons)) {
+                  if (l.homeType === 'bank' && online.has(l.homeId)) continue;
+                  l.statusIds = l.statusIds.filter((x) => x !== s.id);
+                }
                 for (const v of d.views) v.statusIds = v.statusIds.filter((x) => x !== s.id);
               })}>✕</button>
             </div>

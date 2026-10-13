@@ -83,7 +83,7 @@ export default function CloudBankSharing({ bank, isLocalOwner }) {
         ))}
         {bank.cloud.invites.map((i) => (
           <li key={i.email}>
-            <span className="grow">{i.email} <span className="small muted">— invited, joins when they sign in</span></span>
+            <span className="grow">{i.email} <span className="small muted">— invited, joins next time they open Teacher Planner signed in with this email</span></span>
             <span className="badge">{ROLE_LABEL[i.role]}</span>
             {owner && <button className="icon-btn" aria-label={`Cancel invitation for ${i.email}`} disabled={busy} onClick={() => run(() => cloud.cancelInvite(bank.id, i.email), 'Invitation cancelled')}>✕</button>}
           </li>
@@ -94,7 +94,7 @@ export default function CloudBankSharing({ bank, isLocalOwner }) {
         <form className="row wrap invite-form" onSubmit={(e) => {
           e.preventDefault();
           const to = email.trim();
-          run(() => cloud.invite(bank.id, to, role), (r) => (r === 'added' ? `${to} now has access` : `Invitation saved — ${to} joins when they sign in to Teacher Planner with that email`));
+          run(() => cloud.invite(bank.id, to, role), (r) => (r === 'updated' ? `${to}’s access changed` : `Invitation saved — ${to} gets this bank next time they open Teacher Planner signed in with that email`));
           setEmail('');
         }}>
           <input type="email" required placeholder="teammate@school.org" value={email} onChange={(e) => setEmail(e.target.value)} aria-label="Teammate’s email" className="grow" />

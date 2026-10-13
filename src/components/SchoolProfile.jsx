@@ -47,7 +47,7 @@ export default function SchoolProfile({ year }) {
     return (
       <section className="card wide school-card">
         <h2>School profile</h2>
-        <p className="small muted">Share this year’s calendar, days off, bell schedule, grading periods and early-release schedules with colleagues, or join one a colleague shared. Classes, lessons and grades always stay your own.</p>
+        <p className="small muted">Share this year’s calendar, days off, bell schedule, grading periods and early-release schedules with colleagues, or join one a colleague shared. Classes, lessons and grades always stay your own. People in a school can see each other’s names and email addresses.</p>
         <div className="school-choices">
           <form className="subcard" onSubmit={(e) => { e.preventDefault(); run(() => cloud.createSchool(year.id, name.trim()), (c) => `Shared. Colleagues can join with code ${formatJoinCode(c)}.`); }}>
             <h3>Share this schedule with your school</h3>
@@ -135,6 +135,7 @@ export default function SchoolProfile({ year }) {
       {school.seen && (
         <details className="school-members">
           <summary>{(school.members || []).length + 1} {(school.members || []).length ? 'people' : 'person'} in {school.name}</summary>
+          <p className="small muted">Everyone in the school can see each other’s names and email addresses.</p>
           <ul className="list member-list">
             <li><span className="grow"><strong>{isOwner ? 'You' : school.ownerName}</strong></span><span className="badge">Owner</span></li>
             {(school.members || []).map((m) => (

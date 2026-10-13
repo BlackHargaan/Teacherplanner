@@ -151,8 +151,8 @@ Lessons are stored as an ordered sequence per class: lesson *n* is taught at the
 - Google Drive: Drive-link attachments.
 
 ## Current limitations
-- **No server yet.** Your own planner syncs between your computers through a cloud-drive folder. Team members and permissions work within one planner folder (e.g. a team computer, or a folder a team shares, used by one person at a time). Live multi-teacher editing and public share links need a backend with accounts.
-- **Standards library is a sample.** Certified frameworks for every state and district would have to be licensed or curated and loaded through the CSV import or a future API.
+- **Your own planner lives on your computer.** It syncs between your computers through a cloud-drive folder, used by one computer at a time. Only lesson banks you share online and school profiles go through the server (Supabase); rosters, grades and private notes never do.
+- **Shared classes and Shared Views are local.** Sharing a class with a colleague works within one planner folder, and Shared Views are opened or downloaded as pages rather than hosted online.
 - **Google integration doesn't use OAuth.** It relies on file export and share links rather than API sync, so there's no automatic Classroom posting or Drive picker yet.
 
 ## Code map
@@ -164,7 +164,7 @@ Lessons are stored as an ordered sequence per class: lesson *n* is taught at the
 | `src/lib/reports.js` | Standards coverage, achievement, weighted grade averages |
 | `src/lib/ics.js` | iCalendar export and Google Calendar / Classroom links |
 | `src/pages/*` | One file per screen |
-| `src/lib/cloud/` | Online account and team-bank sync: `sync.js` (pure merge/push logic), `backend.js` (Supabase calls), `CloudProvider.jsx` (when to sync) |
+| `src/lib/cloud/` | Online account, team-bank and school-profile sync: `sync.js` and `schoolSync.js` (pure merge/push logic), `backend.js` (Supabase calls), `CloudProvider.jsx` (when to sync) |
 | `supabase/migrations/` | Database tables and row-level security for sign-in and sharing |
 | `electron/main.cjs` | Desktop shell: planner folder, atomic saves, daily backups, file watching, attachments, menus |
 | `electron/updater.cjs` | Update checks, background download and restart-to-update (website download on Mac) |

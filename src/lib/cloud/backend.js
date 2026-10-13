@@ -13,6 +13,11 @@ export function supabase() {
   return clientPromise;
 }
 
+const isDuplicate = (err) => err?.code === '23505' || /duplicate key/i.test(String(err?.message));
+
+/** Errors that mean "not allowed / no longer there" rather than a network problem. */
+export const isRefused = (err) => err instanceof BankGone || ['42501', '23503', 'PGRST116'].includes(err?.code) || /row-level security/i.test(String(err?.message));
+
 const check = ({ data, error }) => {
   if (error) throw error;
   return data;
@@ -47,7 +52,10 @@ export function onAuthChange(cb) {
 }
 
 export async function setDisplayName(userId, name) {
-  check(await (await supabase()).from('profiles').update({ display_name: name, updated_at: new Date().toISOString() }).eq('id', userId));
+  const db = await supabase();
+  check(await db.from('profiles').update({ display_name: name, updated_at: new Date().toISOString() }).eq('id', userId));
+  // Also on the account itself, which is what the settings page shows.
+  return check(await db.auth.updateUser({ data: { display_name: name } })).user;
 }
 
 // ---- banks
@@ -83,10 +91,25 @@ export async function fetchSnapshot(userId) {
   return { userId, banks, lessons, members, profiles, invites, schools, schoolMembers };
 }
 
-/** Upload { banks, lessons, deletes } from changesToPush(). */
+/** The bank is gone online or this account may no longer change it. */
+export class BankGone extends Error {}
+
+/**
+ * Upload one bank's group from changesByBank(). A bank that's already online
+ * is only ever updated, never re-created: if it was deleted (or access was
+ * removed) in the meantime, that's reported as BankGone instead.
+ */
 export async function pushChanges(ch) {
   const db = await supabase();
-  if (ch.banks.length) check(await db.from('banks').upsert(ch.banks, { onConflict: 'id' }));
+  for (const row of ch.banks) {
+    if (ch.isNew) {
+      const { error } = await db.from('banks').insert(row);
+      if (!error) continue;
+      if (!isDuplicate(error)) throw error; // a retry of a publish that already went through
+    }
+    const updated = check(await db.from('banks').update(row).eq('id', row.id).select('id'));
+    if (!updated.length) throw new BankGone(row.id);
+  }
   if (ch.lessons.length) {
     for (let i = 0; i < ch.lessons.length; i += 200) {
       check(await db.from('bank_lessons').upsert(ch.lessons.slice(i, i + 200), { onConflict: 'bank_id,id' }));
@@ -121,8 +144,6 @@ export async function cancelInvite(bankId, email) {
 
 // ---- school profiles
 
-const isDuplicate = (err) => err?.code === '23505' || /duplicate key/i.test(String(err?.message));
-
 /** Create a school; makeCode() is asked again if a join code is already taken. */
 export async function createSchool({ id, name, data }, makeCode) {
   const db = await supabase();
@@ -139,10 +160,23 @@ export async function joinSchool(code) {
   return check(await (await supabase()).rpc('join_school', { p_code: code }));
 }
 
-/** Upload changed school schedules from schoolsToPush(). */
+/**
+ * Upload changed school schedules from schoolsToPush(). Each update only
+ * applies if nobody else changed the school since this teacher's copy
+ * (expected = the version it was based on). Returns the ones that went
+ * through, with the server's new version; the rest are merged and retried
+ * after the next download.
+ */
 export async function pushSchools(list) {
   const db = await supabase();
-  for (const s of list) check(await db.from('schools').update({ name: s.name, data: s.data }).eq('id', s.id));
+  const done = [];
+  for (const s of list) {
+    let q = db.from('schools').update({ name: s.name, data: s.data }).eq('id', s.id);
+    if (s.expected) q = q.eq('updated_at', s.expected);
+    const rows = check(await q.select('updated_at'));
+    if (rows.length) done.push({ ...s, updatedAt: rows[0].updated_at });
+  }
+  return done;
 }
 
 export async function setJoinCode(schoolId, makeCode) {

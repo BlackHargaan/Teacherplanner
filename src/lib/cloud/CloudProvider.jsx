@@ -3,17 +3,18 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useStore } from '../store.jsx';
 import { cloudConfigured } from './config.js';
 import * as api from './backend.js';
-import { applySnapshot, changesToPush, detachBank, fingerprint, markPushed } from './sync.js';
+import { applySnapshot, changesByBank, changesToPush, detachBank, fingerprint, markPushed } from './sync.js';
 import { deleteBankLocally } from '../actions.js';
 import { uid } from '../model.js';
 import {
-  applySchools, makeJoinCode, markSchoolsPushed, markSharedDayTypes, schoolData, schoolPrint, schoolsToPush, unlinkSchool,
+  applySchools, makeJoinCode, markSchoolsPushed, markSharedDayTypes, schoolData, schoolsToPush, unlinkSchool,
 } from './schoolSync.js';
 
 const CloudContext = createContext({ configured: false });
 const SYNC_EVERY_MS = 2 * 60 * 1000;
 const PUSH_DELAY_MS = 1500;
 const CHECK_DELAY_MS = 400;
+const MAX_ROUNDS = 3;
 
 const hasChanges = (ch) => ch.banks.length + ch.lessons.length + ch.deletes.length > 0;
 const anythingToPush = (state) => hasChanges(changesToPush(state)) || schoolsToPush(state).length > 0;
@@ -35,32 +36,48 @@ export function CloudProvider({ children }) {
     return api.onAuthChange((s) => { setSession(s); if (!s) setStatus('signed-out'); });
   }, []);
 
-  // ---- one sync round: push local edits, then pull everything
+  // ---- one sync round: pull everything, then push local edits. Pulling
+  // first means roles, removals, deletions and a change of account are known
+  // before anything is uploaded (unsent local edits are kept by the merge).
   const sync = useCallback(async () => {
     if (!user || !latest.current) return;
     if (running.current) { again.current = true; return; }
     running.current = true;
     setStatus('syncing');
     try {
+      let refused = null;
+      let rounds = 0;
       do {
         again.current = false;
-        const ch = changesToPush(latest.current);
-        if (hasChanges(ch)) {
-          await api.pushChanges(ch);
-          applyRemote((d) => markPushed(d, ch));
-        }
-        const schools = schoolsToPush(latest.current);
-        if (schools.length) {
-          await api.pushSchools(schools);
-          applyRemote((d) => markSchoolsPushed(d, schools));
-        }
+        rounds += 1;
+        refused = null;
+        await api.acceptInvites().catch(() => {}); // banks teammates invited this email to
         const snap = await api.fetchSnapshot(user.id);
         // Teammates' changes also go into undo history (see applyRemote);
         // skip that work when nothing online changed since the last pull.
         const snapPrint = fingerprint(snap);
         applyRemote((d) => { applySnapshot(d, snap, d.currentUserId); applySchools(d, snap); }, { history: snapPrint !== lastSnap.current });
         lastSnap.current = snapPrint;
-      } while (again.current);
+
+        // One bank at a time, so one that's refused doesn't hold up the rest.
+        for (const group of changesByBank(latest.current, changesToPush(latest.current))) {
+          try {
+            await api.pushChanges(group);
+            applyRemote((d) => markPushed(d, group));
+          } catch (err) {
+            if (!api.isRefused(err)) throw err;
+            refused = err; // access changed since the pull: the next one sorts it out
+            again.current = true;
+          }
+        }
+        const schools = schoolsToPush(latest.current);
+        if (schools.length) {
+          const done = await api.pushSchools(schools);
+          applyRemote((d) => markSchoolsPushed(d, done));
+          if (done.length < schools.length) again.current = true; // changed online meanwhile: merge, then retry
+        }
+      } while (again.current && rounds < MAX_ROUNDS);
+      if (refused) throw refused;
       setError(null);
       setStatus('synced');
     } catch (err) {
@@ -75,8 +92,7 @@ export function CloudProvider({ children }) {
   const plannerLoaded = !!state;
   useEffect(() => {
     if (!user || !plannerLoaded) return undefined;
-    let stop = false;
-    api.acceptInvites().catch(() => {}).finally(() => !stop && sync());
+    sync();
     const timer = setInterval(sync, SYNC_EVERY_MS);
     const onFocus = () => sync();
     window.addEventListener('focus', onFocus);
@@ -84,7 +100,6 @@ export function CloudProvider({ children }) {
     let debounce;
     const unsubscribe = api.subscribe(() => { clearTimeout(debounce); debounce = setTimeout(sync, 800); });
     return () => {
-      stop = true;
       clearInterval(timer);
       clearTimeout(debounce);
       window.removeEventListener('focus', onFocus);
@@ -121,7 +136,10 @@ export function CloudProvider({ children }) {
       setSession(null);
       setStatus('signed-out');
     },
-    setDisplayName: (name) => api.setDisplayName(user.id, name),
+    setDisplayName: async (name) => {
+      const updated = await api.setDisplayName(user.id, name);
+      if (updated) setSession((s) => (s ? { ...s, user: updated } : s));
+    },
     syncNow: sync,
 
     /** Share a local bank online (the signed-in teacher becomes its owner). */
@@ -166,14 +184,22 @@ export function CloudProvider({ children }) {
     // ---- school profiles (one per school year)
     /** Share this year's calendar and bell schedule; the teacher becomes its owner. */
     createSchool: async (yearId, name) => {
-      applyRemote((d) => markSharedDayTypes(d.years.find((y) => y.id === yearId)));
-      const year = latest.current.years.find((y) => y.id === yearId);
+      // Worked out on a copy: nothing changes here unless the upload succeeds.
+      const copy = structuredClone(latest.current.years.find((y) => y.id === yearId));
+      markSharedDayTypes(copy);
+      const data = schoolData(copy);
       const id = uid('school');
-      const row = await api.createSchool({ id, name, data: schoolData(year) }, makeJoinCode);
+      const row = await api.createSchool({ id, name, data }, makeJoinCode);
+      const sent = { name: row.name, data };
       applyRemote((d) => {
         const y = d.years.find((x) => x.id === yearId);
-        y.school = { id, name: row.name, role: 'owner', joinCode: row.join_code, ownerId: row.owner_id, members: [], seen: true };
-        y.school.shadow = schoolPrint(y);
+        markSharedDayTypes(y);
+        // Not marked seen until a download includes it, so a sync that was
+        // already under way can't mistake it for a deleted school.
+        y.school = {
+          id, name: row.name, role: 'owner', joinCode: row.join_code, ownerId: row.owner_id, members: [],
+          updatedAt: row.updated_at, base: structuredClone(sent), shadow: fingerprint(sent),
+        };
       });
       sync();
       return row.join_code;

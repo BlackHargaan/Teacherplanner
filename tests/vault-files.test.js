@@ -89,13 +89,19 @@ describe('moving attachments to a new folder', () => {
     expect(copyMissingFiles(path.join(dir, 'none'), path.join(dir, 'to'))).toEqual({ copied: 0, skipped: 0, failed: [] });
   });
 
-  it.skipIf(process.getuid?.() === 0)('reports files it couldn’t copy', () => {
+  it('reports files it couldn’t copy', () => {
+    // A file already sits where the "worksheets" folder has to go, so that
+    // folder can't be copied (works the same on Windows, Mac and Linux).
     const from = path.join(dir, 'from');
-    fs.mkdirSync(from);
-    fs.writeFileSync(path.join(from, 'locked.pdf'), 'x');
-    fs.chmodSync(path.join(from, 'locked.pdf'), 0o000);
-    const res = copyMissingFiles(from, path.join(dir, 'to'));
-    expect(res.failed).toEqual(['locked.pdf']);
+    fs.mkdirSync(path.join(from, 'worksheets'), { recursive: true });
+    fs.writeFileSync(path.join(from, 'worksheets', 'a.pdf'), 'x');
+    fs.writeFileSync(path.join(from, 'ok.pdf'), 'x');
+    const to = path.join(dir, 'to');
+    fs.mkdirSync(to);
+    fs.writeFileSync(path.join(to, 'worksheets'), 'not a folder');
+    const res = copyMissingFiles(from, to);
+    expect(res.failed).toEqual(['worksheets']);
+    expect(res.copied).toBe(1);
   });
 });
 

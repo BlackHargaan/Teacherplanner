@@ -1,3 +1,4 @@
+import { BrandMark } from './components/BrandMark.jsx';
 import { useEffect, useState } from 'react';
 import { host, useStore } from './lib/store.jsx';
 import { applyAppearance } from './data/themes.js';
@@ -109,7 +110,7 @@ export default function App() {
     <div className="app">
       <aside className={`sidebar no-print ${menuOpen ? 'open' : ''}`} aria-label="Teacher Planner">
         <a className="brand" href="#/planner">
-          <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="10" fill="var(--accent)" /><path d="M6.5 11.5l3 3 6-7" fill="none" stroke="var(--accent-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          <BrandMark />
           Teacher Planner
         </a>
         {sidebarNav}

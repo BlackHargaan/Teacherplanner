@@ -1,3 +1,4 @@
+import { BrandMark } from '../components/BrandMark.jsx';
 import { useState } from 'react';
 import { host, useStore, resetToDemo, resetToEmpty } from '../lib/store.jsx';
 
@@ -47,7 +48,7 @@ export default function Welcome() {
   return (
     <div className="welcome">
       <div className="welcome-card">
-        <div className="welcome-logo">📘</div>
+        <BrandMark size={56} className="welcome-logo" />
         <h1>Welcome to Teacher Planner</h1>
         {!vault.vaultPath ? (
           <>

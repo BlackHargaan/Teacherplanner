@@ -330,7 +330,7 @@ function createWindow(hash = '') {
     minWidth: 760,
     minHeight: 560,
     title: 'Teacher Planner',
-    icon: path.join(__dirname, '..', 'build', 'icon.png'),
+    icon: path.join(__dirname, '..', 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
     autoHideMenuBar: true,
     webPreferences: {
       preload: PRELOAD,

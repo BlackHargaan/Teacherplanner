@@ -44,7 +44,8 @@
       "dist/**/*",
       "electron/**/*",
       "build/icon.png",
-      "package.json"
+      "package.json",
+      "build/icon.ico"
     ],
     "publish": [
       {
@@ -62,7 +63,8 @@
             "x64"
           ]
         }
-      ]
+      ],
+      "icon": "build/icon.ico"
     },
     "nsis": {
       "oneClick": true,

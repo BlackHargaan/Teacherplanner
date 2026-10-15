@@ -2,7 +2,7 @@
   "name": "teacher-planner",
   "productName": "Teacher Planner",
   "private": true,
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "Lesson planner for teachers — schedules, lessons, standards, gradebook and seating charts.",
   "author": "Teacher Planner",
   "type": "module",

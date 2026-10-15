@@ -5,6 +5,7 @@ import App from './App.jsx';
 import '@fontsource-variable/lexend';
 import { CloudProvider } from './lib/cloud/CloudProvider.jsx';
 import { TourProvider } from './components/Tour.jsx';
+import { Splash } from './components/Splash.jsx';
 import './styles.css';
 
 createRoot(document.getElementById('root')).render(
@@ -13,6 +14,7 @@ createRoot(document.getElementById('root')).render(
       <CloudProvider>
         <TourProvider>
           <App />
+          <Splash />
         </TourProvider>
       </CloudProvider>
     </StoreProvider>

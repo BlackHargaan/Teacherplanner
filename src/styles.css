@@ -489,3 +489,16 @@ fieldset.subcard { min-width: 0; margin: 0; }
 }
 .help-menu > .icon-btn { font-weight: 700; border: 1px solid var(--border); border-radius: 50%; width: 2rem; height: 2rem; padding: 0; justify-content: center; line-height: 1; }
 @media (prefers-reduced-motion: reduce) { .tour-spot { transition: none; } }
+
+/* ---------- Opening splash ---------- */
+.tp-splash { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; background: var(--bg); transition: opacity 350ms ease; }
+.tp-splash-out { opacity: 0; pointer-events: none; }
+.tp-logo-svg * { transform-box: fill-box; transform-origin: center; }
+.tp-outer { animation: tpScaleSpring 0.65s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+.tp-inner { opacity: 0; animation: tpScaleSpring 0.65s cubic-bezier(0.34, 1.56, 0.64, 1) 0.12s forwards; }
+.tp-stroke { stroke-dasharray: 140; stroke-dashoffset: 140; animation: tpDrawInk 0.55s cubic-bezier(0.65, 0, 0.35, 1) 0.35s forwards; }
+.tp-p-bowl { animation-delay: 0.5s; }
+.tp-underline { opacity: 0; transform: scaleX(0); animation: tpUnderlineSnap 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) 0.72s forwards; }
+@keyframes tpScaleSpring { 0% { opacity: 0; transform: scale(0.4); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes tpDrawInk { to { stroke-dashoffset: 0; } }
+@keyframes tpUnderlineSnap { 0% { opacity: 1; transform: scaleX(0); } 100% { opacity: 1; transform: scaleX(1); } }

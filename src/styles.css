@@ -103,23 +103,22 @@ fieldset.plain { border: 0; padding: 0; margin: 0; min-width: 0; }
 .dot { display: inline-block; width: 0.7rem; height: 0.7rem; border-radius: 50%; flex: none; }
 .badge { display: inline-block; font: 500 0.7rem/1.4 var(--mono); padding: 0 0.3rem; margin-left: 0.35rem; border-radius: 0; background: none; border: 1px solid var(--rule); color: var(--muted); }
 
-/* layout: a sidebar with the pages, then a slim top bar over the page */
-.app { display: grid; grid-template-columns: 224px minmax(0, 1fr); min-height: 100vh; }
-.sidebar { position: sticky; top: 0; height: 100vh; overflow-y: auto; background: var(--surface); border-right: 1px solid var(--rule); padding: 1.2rem 0.75rem 1rem; display: flex; flex-direction: column; gap: 1.2rem; }
-.brand { display: flex; align-items: center; gap: 0.55rem; padding: 0 0.55rem; font-weight: 600; font-size: 1.02rem; text-decoration: none; color: var(--text); }
-#main-nav { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
-#main-nav a { padding: 0.32rem 0.55rem; color: var(--text); text-decoration: none; }
-#main-nav a:hover { text-decoration: underline; text-underline-offset: 3px; }
-#main-nav a.on { font-weight: 600; }
-.year-card { margin-top: auto; border-top: 1px solid var(--rule); padding: 0.7rem 0.3rem 0; display: flex; flex-direction: column; gap: 0.45rem; }
-.year-card select { width: 100%; font-weight: 600; font-size: 0.86rem; padding: 0.35rem 0.4rem; }
-.year-meter { height: 3px; background: var(--rule); overflow: hidden; }
-.year-meter > div { height: 100%; background: var(--text); }
-.main-col { min-width: 0; display: flex; flex-direction: column; }
-.topbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 0.6rem; padding: 0.6rem 1.25rem; background: var(--bg); border-bottom: 1px solid var(--rule); }
+/* layout: the pages across the top like a plan book's tabs, the page below at full width */
+.app { min-height: 100vh; display: flex; flex-direction: column; }
+.masthead { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 0.6rem 1.1rem; padding: 0 1.25rem; min-height: 3.2rem; background: var(--bg); border-bottom: 2px solid var(--ink-rule); }
+.brand { display: flex; align-items: center; gap: 0.5rem; font-weight: 700; font-size: 1rem; text-decoration: none; color: var(--text); white-space: nowrap; }
+#main-nav { display: flex; align-items: center; gap: 0.15rem 0.9rem; flex-wrap: wrap; }
+#main-nav a, .nav-more > .icon-btn { padding: 0.15rem 0.05rem; color: var(--text); text-decoration: none; font-size: 0.95rem; white-space: nowrap; }
+#main-nav a:hover, .nav-more > .icon-btn:hover { text-decoration: underline; text-underline-offset: 4px; }
+#main-nav a.on, .nav-more.on > .icon-btn { font-weight: 600; }
+.nav-more > .icon-btn { border: 0; background: none; }
+.nav-more.on > .icon-btn { background-image: linear-gradient(transparent 52%, var(--mark) 52%, var(--mark) 92%, transparent 92%); color: var(--mark-text); }
+.nav-narrow { display: none; }
+.year-progress { font: 500 0.78rem var(--mono); color: var(--muted); white-space: nowrap; }
+.main-col { min-width: 0; display: flex; flex-direction: column; flex: 1; }
 .nav-toggle { display: none; }
-.sidebar-backdrop { display: none; }
-.topbar select.who { max-width: 12rem; }
+.nav-backdrop { display: none; }
+.masthead select.who { max-width: 12rem; }
 .page { padding: 0.5rem 1.25rem 1.5rem; max-width: 1600px; margin: 0 auto; }
 .page-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
 .split { display: grid; grid-template-columns: 280px 1fr; gap: 1rem; align-items: start; }
@@ -450,15 +449,17 @@ kbd { font: inherit; font-size: 0.8em; border: 1px solid var(--border); border-b
 }
 .import-table tr.muted td { color: var(--muted); }
 
-/* Narrow windows: the sidebar folds away behind the menu button (kept last so it wins). */
-@media (max-width: 899px) {
-  .app { grid-template-columns: minmax(0, 1fr); }
-  .sidebar { display: none; }
-  .sidebar.open { display: flex; position: fixed; inset: 0 auto 0 0; width: min(280px, 85vw); z-index: 60; box-shadow: 0 0 40px rgba(0, 0, 0, 0.25); }
-  .sidebar-backdrop { display: block; position: fixed; inset: 0; z-index: 55; background: rgba(15, 23, 42, 0.35); }
-  .topbar { flex-wrap: wrap; padding: 0.55rem 0.75rem; }
+/* Narrow windows: the pages fold into a menu under the top bar (kept last so it wins). */
+@media (max-width: 1099px) {
+  .masthead { flex-wrap: wrap; padding: 0.45rem 0.75rem; }
   .nav-toggle { display: inline-flex; align-items: center; gap: 0.4rem; }
-  .topbar > .grow { display: none; }
+  #main-nav { display: none; }
+  #main-nav.open { display: flex; flex-direction: column; align-items: flex-start; position: absolute; top: 100%; left: 0; right: 0; z-index: 60; padding: 0.6rem 1rem 0.9rem; background: var(--bg); border-bottom: 2px solid var(--ink-rule); }
+  #main-nav.open a { padding: 0.35rem 0.1rem; }
+  #main-nav.open .nav-narrow { display: contents; }
+  #main-nav.open .nav-more { display: none; }
+  .nav-backdrop { display: block; position: fixed; inset: 0; z-index: 15; background: rgba(15, 23, 42, 0.25); }
+  .masthead > .grow { display: none; }
   .global-search { flex: 1 1 10rem; }
   .global-search input, .global-search input:focus { width: 100%; }
   .page { padding: 0.5rem 0.75rem 1rem; }
@@ -556,3 +557,4 @@ fieldset.subcard { min-width: 0; margin: 0; }
   .planbook { font-size: 9pt; }
   .pb-cell.is-today, .pb-day.is-today { background: none; }
 }
+.nav-more .menu-pop { left: 0; right: auto; min-width: 180px; }

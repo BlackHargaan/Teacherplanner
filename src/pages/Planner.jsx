@@ -9,6 +9,7 @@ import { dayKeyLabel, isNonSchoolDay, meetingIndexOnOrAfter, weekDates, weekStar
 import { paintDates } from '../lib/calendarPaint.js';
 import { schoolReadOnly } from '../lib/cloud/schoolSync.js';
 import LessonEditor from '../components/LessonEditor.jsx';
+import { YearProgress } from '../components/YearProgress.jsx';
 import { LessonContent, StatusChips } from '../components/LessonContent.jsx';
 import { Field, Menu, Modal, Tabs, Empty } from '../components/ui.jsx';
 
@@ -67,6 +68,7 @@ export default function Planner() {
           ))}
         </div>
         <label className="row small"><input type="checkbox" checked={detail} onChange={(e) => setDetail(e.target.checked)} /> Details</label>
+        <YearProgress />
         <Menu
           className="print-menu"
           title="Print / PDF"

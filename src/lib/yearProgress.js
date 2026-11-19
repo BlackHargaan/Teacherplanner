@@ -1,7 +1,7 @@
 import { gradingPeriodFor } from './schedule.js';
 
 /**
- * Where today falls in the school year, for the sidebar:
+ * Where today falls in the school year, for the planner:
  * { stage: 'before' | 'during' | 'after', day, total, percent, term }.
  * `days` are the year's school days ({ date }), in order.
  */

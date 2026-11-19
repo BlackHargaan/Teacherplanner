@@ -133,7 +133,7 @@ function TourStep({ tour, tourId, index, dir, route, go, finish }) {
     const behavior = reducedMotion() ? 'auto' : 'smooth';
     if (r0.height > window.innerHeight * 0.6) {
       // Taller than most of the window: show its top, just below the header.
-      const header = document.querySelector('.topbar')?.getBoundingClientRect().bottom || 0;
+      const header = document.querySelector('.masthead')?.getBoundingClientRect().bottom || 0;
       if (r0.top < header + 8 || r0.top > window.innerHeight * 0.4) window.scrollBy({ top: r0.top - header - 16, behavior });
     } else if (r0.top < 60 || r0.bottom > window.innerHeight - 40) target.scrollIntoView({ block: 'center', behavior });
     let frame;
@@ -154,7 +154,7 @@ function TourStep({ tour, tourId, index, dir, route, go, finish }) {
     const placed = placeBox(spot, { width: b.width, height: b.height }, window.innerWidth, window.innerHeight);
     // No room above or below where it sits now, but the highlight and the box
     // fit on screen together: scroll it up once so the box goes underneath.
-    const header = document.querySelector('.topbar')?.getBoundingClientRect().bottom || 0;
+    const header = document.querySelector('.masthead')?.getBoundingClientRect().bottom || 0;
     if (placed.placement === 'inside' && !nudged.current && spot.height + b.height + 40 <= window.innerHeight - header) {
       nudged.current = true;
       window.scrollBy({ top: spot.top - header - 12, behavior: reducedMotion() ? 'auto' : 'smooth' });

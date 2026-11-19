@@ -135,7 +135,7 @@ Lessons are stored as an ordered sequence per class: lesson *n* is taught at the
 - Custom **status tags** (Draft, Ready, Needs Review, Approved, Taught…).
 - Standards, teaching strategies, differentiation and accommodations come from a built-in library, and you can add your own entries.
 - Class color, font, text size and display order.
-- **Appearance** (Settings): the calm "Quiet Desk" look (Lexend type, pages in a sidebar with a school-year progress card, softly tinted lesson cards) in 8 palettes: Sage, Harbor, Heather, Sand & Teal, Slate, Rosewood, Marigold and Graphite. Each has a light and a dark version (or match the computer), all checked for readable contrast in `tests/themes.test.js`. It's saved per teacher, and lesson-section colors stay readable in dark mode.
+- **Appearance** (Settings): the "Plan Book" look, modeled on a paper teacher plan book. The week is a ruled grid with a row per class and a column per day, a red margin rule and hatched days off. Sections are separated by rules rather than boxed cards, corners are square, and type is IBM Plex Sans with Plex Mono for times. A highlighter mark shows the current page, view and today. It comes in 8 palettes: Sage, Harbor, Heather, Sand & Teal, Slate, Rosewood, Marigold and Graphite. Each has a light and a dark version (or match the computer), all checked for readable contrast in `tests/themes.test.js`. It's saved per teacher, and lesson-section colors stay readable in dark mode.
 
 ### Collaboration (`Collaborate`)
 - **Team lesson banks** and **shared classes**, with *view* or *edit* access per teacher and **per-section overrides** (hidden / view / edit).

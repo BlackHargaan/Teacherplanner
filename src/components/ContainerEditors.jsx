@@ -52,7 +52,7 @@ export function SectionsEditor({ container, edit }) {
                   {FONTS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
                   {!FONTS.some((f) => f.value === s.font) && <option value={s.font}>{s.font}</option>}
                 </select>
-                <input className="mini" placeholder="custom font" title="Any installed font name, e.g. Lexend" onBlur={(e) => e.target.value && setSec(s.id, { font: e.target.value })} />
+                <input className="mini" placeholder="custom font" title="Any installed font name, e.g. Georgia" onBlur={(e) => e.target.value && setSec(s.id, { font: e.target.value })} />
               </td>
               <td>
                 <select value={s.size} onChange={(e) => setSec(s.id, { size: e.target.value })}>

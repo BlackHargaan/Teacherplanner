@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { navigate, useHashRoute } from '../lib/router.js';
 import { useStore } from '../lib/store.jsx';
 import { canEdit, canView, uid } from '../lib/model.js';
@@ -93,8 +93,10 @@ export default function Planner() {
           onOpen={setEditing}
           onDialog={setDialog}
         />
+      ) : mode === 'week' ? (
+        <PlanBookWeek dates={dates} classes={shown} detail={detail} onOpen={setEditing} onDialog={setDialog} />
       ) : (
-        <div className="week-grid" style={{ gridTemplateColumns: `repeat(${dates.length}, minmax(${mode === 'day' ? 320 : 170}px, 1fr))` }}>
+        <div className="week-grid" style={{ gridTemplateColumns: `repeat(${dates.length}, minmax(320px, 1fr))` }}>
           {dates.map((date) => (
             <DayColumn
               key={date}
@@ -126,30 +128,93 @@ function firstSchoolDay(calendar, date) {
 // drop, so the source lives here while a drag is in progress.
 let dragSource = null;
 
-function DayColumn({ date, day, shownIds, detail, onOpen, onDialog }) {
+/** A day's heading: date, rotation day or day off, alternate schedule, and the day menu. */
+function DayHead({ date, day, onDialog, className = 'day-head' }) {
   const { year } = useStore();
   const off = isNonSchoolDay(year, date);
   const outside = date < year.start || date > year.end;
   const removed = (year.overrides || []).filter((o) => o.date === date && o.type === 'remove');
   return (
-    <section className={`day-col ${date === today() ? 'is-today' : ''}`}>
-      <header className="day-head">
-        <div>
-          <div className="day-name">{formatDate(date, { weekday: 'short', month: 'short', day: 'numeric' })}</div>
-          <div className="small muted">
-            {/* On a weekly schedule the day label would just repeat the weekday. */}
-            {day ? (year.scheduleType === 'weekly' ? '' : dayKeyLabel(day.dayKey, year)) : outside ? 'Outside school year' : off ? off.label : 'No school'}
-            {day?.dayType && <span className="badge">{day.dayType.name}</span>}
-          </div>
+    <header className={className}>
+      <div>
+        <div className="day-name"><span className="mark-on">{formatDate(date, { weekday: 'short', month: 'short', day: 'numeric' })}</span></div>
+        <div className="small muted">
+          {/* On a weekly schedule the day label would just repeat the weekday. */}
+          {day ? (year.scheduleType === 'weekly' ? '' : dayKeyLabel(day.dayKey, year)) : outside ? 'Outside school year' : off ? off.label : 'No school'}
+          {day?.dayType && <span className="badge">{day.dayType.name}</span>}
         </div>
-        {day && <DayMenu date={date} day={day} removed={removed} onDialog={onDialog} />}
-      </header>
+      </div>
+      {day && <DayMenu date={date} day={day} removed={removed} onDialog={onDialog} />}
+    </header>
+  );
+}
+
+function DayColumn({ date, day, shownIds, detail, onOpen, onDialog }) {
+  const { year } = useStore();
+  const off = isNonSchoolDay(year, date);
+  return (
+    <section className={`day-col ${date === today() ? 'is-today' : ''}`}>
+      <DayHead date={date} day={day} onDialog={onDialog} />
       {day && day.meetings.filter((m) => shownIds.has(m.classId)).map((m) => (
         <MeetingCard key={`${m.classId}-${m.start}-${m.overrideId || ''}`} m={m} date={date} detail={detail} onOpen={onOpen} onDialog={onDialog} />
       ))}
       {day && day.meetings.length === 0 && <div className="muted small pad">No classes scheduled.</div>}
       {!day && off && <div className="off-day">{off.label}</div>}
     </section>
+  );
+}
+
+/** The usual meeting time and room for a class's row heading. */
+function usualTime(cls) {
+  const counts = new Map();
+  for (const s of cls.slots || []) {
+    if (!s.start) continue;
+    const key = `${s.start}|${s.end}`;
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  const best = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+  if (!best) return '';
+  const [start, end] = best.split('|');
+  return `${formatTime(start)}–${formatTime(end)}${counts.size > 1 ? ' (varies)' : ''}`;
+}
+
+/**
+ * The week as a paper plan book: one row per class, one column per day.
+ * Days off are hatched; the red margin rule separates classes from days.
+ */
+function PlanBookWeek({ dates, classes, detail, onOpen, onDialog }) {
+  const { calendar } = useStore();
+  const now = today();
+  if (!classes.length) return null;
+  return (
+    <div className="planbook-scroll">
+      <div className="planbook" style={{ gridTemplateColumns: `minmax(8.5rem, 10rem) repeat(${dates.length}, minmax(11rem, 1fr))` }}>
+        <div className="pb-corner" aria-hidden="true" />
+        {dates.map((date) => (
+          <DayHead key={date} date={date} day={calendar.byDate[date]} onDialog={onDialog} className={`pb-day ${date === now ? 'is-today' : ''}`} />
+        ))}
+        {classes.map((cls) => (
+          <Fragment key={cls.id}>
+            <div className="pb-class" style={{ '--c': cls.color }}>
+              <div className="pb-class-name">{cls.name}</div>
+              <div className="pb-meta">{usualTime(cls)}</div>
+              {cls.room && <div className="pb-meta">{cls.room}</div>}
+            </div>
+            {dates.map((date) => {
+              const day = calendar.byDate[date];
+              const meetings = day ? day.meetings.filter((m) => m.classId === cls.id) : [];
+              return (
+                <div key={date} className={`pb-cell ${date === now ? 'is-today' : ''} ${day ? '' : 'pb-off'}`}>
+                  {meetings.map((m) => (
+                    <MeetingCard key={`${m.start}-${m.overrideId || ''}`} m={m} date={date} detail={detail} onOpen={onOpen} onDialog={onDialog} inRow />
+                  ))}
+                </div>
+              );
+            })}
+          </Fragment>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -188,7 +253,7 @@ function DayMenu({ date, day, removed, onDialog }) {
   );
 }
 
-function MeetingCard({ m, date, detail, onOpen, onDialog }) {
+function MeetingCard({ m, date, detail, onOpen, onDialog, inRow = false }) {
   const { state, update, notify, year, classes, userId } = useStore();
   const cls = classes.find((c) => c.id === m.classId);
   const lessonId = cls.sequence[m.index];
@@ -258,7 +323,7 @@ function MeetingCard({ m, date, detail, onOpen, onDialog }) {
       {...dragProps}
       {...dropProps}
       title={dragProps.draggable ? 'Click to edit · drag to move (or onto another class to copy)' : undefined}
-      className={`meeting ${lesson ? '' : 'meeting-empty'} ${dropMode ? 'drop-over' : ''}`}
+      className={`meeting ${inRow ? 'meeting-in-row' : ''} ${lesson ? '' : 'meeting-empty'} ${dropMode ? 'drop-over' : ''}`}
       style={{ '--c': cls.color, fontFamily: cls.font, fontSize: cls.fontSize }}
       onClick={() => onOpen({ containerId: cls.id, index: m.index, date, meeting: m })}
       tabIndex={0}
@@ -266,8 +331,9 @@ function MeetingCard({ m, date, detail, onOpen, onDialog }) {
     >
       <div className="meeting-head">
         <div>
-          <div className="meeting-class">{cls.name}{m.extra && <span className="badge">Extra</span>}</div>
-          <div className="small muted">{formatTime(m.start)}–{formatTime(m.end)}{cls.room ? ` · ${cls.room}` : ''}</div>
+          {/* In the plan book the row already names the class. */}
+          {!inRow && <div className="meeting-class">{cls.name}{m.extra && <span className="badge">Extra</span>}</div>}
+          <div className="meeting-time">{formatTime(m.start)}–{formatTime(m.end)}{!inRow && cls.room ? ` · ${cls.room}` : ''}{inRow && m.extra && <span className="badge">Extra</span>}</div>
         </div>
         {editable && (
           <Menu

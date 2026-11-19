@@ -18,7 +18,8 @@
     "dist:linux": "vite build && electron-builder --linux"
   },
   "dependencies": {
-    "@fontsource-variable/lexend": "^5.1.1",
+    "@fontsource/ibm-plex-mono": "^5.1.1",
+    "@fontsource/ibm-plex-sans": "^5.1.1",
     "electron-updater": "^6.3.9"
   },
   "devDependencies": {

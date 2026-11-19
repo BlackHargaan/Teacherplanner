@@ -50,6 +50,14 @@ jobs:
         env:
           # Builds are unsigned until signing certificates are added as secrets.
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Browser version
+        # The same build, zipped for teachertechtools.org/app (the website
+        # repo installs the latest release's copy). After packaging, so the
+        # desktop app doesn't carry it.
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          node -p "require('./package.json').version" > dist/version.txt
+          (cd dist && zip -qr ../release/Teacher-Planner-web.zip .)
       - uses: actions/upload-artifact@v4
         with:
           name: installers-${{ matrix.os }}
@@ -59,6 +67,7 @@ jobs:
             release/*.dmg
             release/*.AppImage
             release/*.deb
+            release/Teacher-Planner-web.zip
             release/*.blockmap
             release/latest*.yml
 

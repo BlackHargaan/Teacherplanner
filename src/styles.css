@@ -13,6 +13,7 @@
   /* Plan book: ruled lines take the palette's color; a red margin rule; a highlighter for "you are here". */
   --rule: color-mix(in srgb, var(--accent) 30%, var(--border));
   --ink-rule: var(--text);
+  --planbook-top: var(--ink-rule);
   --margin-line: color-mix(in srgb, #C2412F 60%, transparent);
   --mark: #FFE14D;
   --mark-text: #1A1A16;
@@ -42,6 +43,9 @@
     --margin-line: color-mix(in srgb, #E07A6B 55%, transparent);
     --mark: color-mix(in srgb, #FFD60A 34%, transparent);
     --mark-text: var(--text);
+    /* Heavy rules in near-white glare on a dark page: soften them, and the plan book just keeps its grid lines. */
+    --ink-rule: color-mix(in srgb, var(--text) 30%, var(--surface));
+    --planbook-top: var(--rule);
     color-scheme: dark;
   }
 }
@@ -61,6 +65,8 @@
   --margin-line: color-mix(in srgb, #E07A6B 55%, transparent);
   --mark: color-mix(in srgb, #FFD60A 34%, transparent);
   --mark-text: var(--text);
+  --ink-rule: color-mix(in srgb, var(--text) 30%, var(--surface));
+  --planbook-top: var(--rule);
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -535,7 +541,7 @@ fieldset.subcard { min-width: 0; margin: 0; }
 
 /* ---------- Plan book (week view): a row per class, a column per day ---------- */
 .planbook-scroll { overflow-x: auto; padding-bottom: 0.5rem; }
-.planbook { display: grid; border: 1px solid var(--rule); border-top: 2px solid var(--ink-rule); background: var(--surface); }
+.planbook { display: grid; border: 1px solid var(--rule); border-top: 2px solid var(--planbook-top); background: var(--surface); }
 .planbook > * { border-top: 1px solid var(--rule); min-width: 0; }
 .pb-corner, .pb-day { border-top: 0; }
 .pb-day { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.3rem; padding: 0.5rem 0.6rem 0.45rem; border-left: 1px solid var(--rule); }

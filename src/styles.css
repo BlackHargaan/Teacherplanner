@@ -177,7 +177,7 @@ fieldset.plain { border: 0; padding: 0; margin: 0; min-width: 0; }
 .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 0.8rem 1rem; border-bottom: 1px solid var(--border); }
 .modal-head h2 { margin: 0; font-size: 1.05rem; }
 .modal-body { padding: 1rem; overflow: auto; display: flex; flex-direction: column; gap: 0.75rem; }
-.modal-foot { display: flex; gap: 0.5rem; padding: 0.75rem 1rem; border-top: 1px solid var(--border); }
+.modal-foot { display: flex; flex-wrap: wrap; gap: 0.5rem; padding: 0.75rem 1rem; border-top: 1px solid var(--border); }
 .editor-grid { display: grid; grid-template-columns: 3fr 2fr; gap: 1.25rem; }
 .editor-grid > div { display: flex; flex-direction: column; gap: 0.75rem; min-width: 0; }
 .attach-editor { display: flex; flex-direction: column; gap: 0.4rem; }
@@ -502,3 +502,12 @@ fieldset.subcard { min-width: 0; margin: 0; }
 @keyframes tpScaleSpring { 0% { opacity: 0; transform: scale(0.4); } 100% { opacity: 1; transform: scale(1); } }
 @keyframes tpDrawInk { to { stroke-dashoffset: 0; } }
 @keyframes tpUnderlineSnap { 0% { opacity: 1; transform: scaleX(0); } 100% { opacity: 1; transform: scaleX(1); } }
+
+/* ---------- Saving plans online ---------- */
+.saving-online { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.6rem; align-items: flex-start; }
+.saving-online h3 { font-size: 1rem; }
+.online-split { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; width: 100%; }
+.online-split > div { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 0.6rem 0.75rem; }
+.online-split p { margin: 0.25rem 0 0; }
+@media (max-width: 640px) { .online-split { grid-template-columns: 1fr; } }
+

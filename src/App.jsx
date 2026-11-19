@@ -5,7 +5,7 @@ import { applyAppearance } from './data/themes.js';
 import Welcome from './pages/Welcome.jsx';
 import LoadError from './pages/LoadError.jsx';
 import { UpdateBanner } from './components/Updates.jsx';
-import { CloudStatus } from './components/CloudAccount.jsx';
+import { CloudStatus, PlannerChoiceDialog } from './components/CloudAccount.jsx';
 import { useHashRoute } from './lib/router.js';
 import { currentUser } from './lib/model.js';
 import Planner from './pages/Planner.jsx';
@@ -28,7 +28,7 @@ import { TOURS } from './lib/tours.js';
 import { yearProgress } from './lib/yearProgress.js';
 import { formatDate, today } from './lib/dates.js';
 import { backupReminder } from './lib/browserStorage.js';
-import { exportBackup } from './pages/Settings.jsx';
+import { exportBackup } from './lib/backup.js';
 
 const PAGES = [
   ['planner', 'Planner', Planner],
@@ -167,6 +167,7 @@ export default function App() {
         <UpdateBanner />
         <main key={`${id}-${year?.id}-${me.id}`}><Page /></main>
       </div>
+      <PlannerChoiceDialog />
       <Toast toast={toast} />
     </div>
   );

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { UpdatesCard } from '../components/Updates.jsx';
 import { AccountCard } from '../components/CloudAccount.jsx';
+import { useCloud } from '../lib/cloud/CloudProvider.jsx';
 import { useHashRoute } from '../lib/router.js';
 import { host, useStore, resetToDemo, resetToEmpty } from '../lib/store.jsx';
 import { uid } from '../lib/model.js';
@@ -11,10 +12,13 @@ import { MODES, PALETTES, paletteById } from '../data/themes.js';
 import { useTour } from '../components/Tour.jsx';
 import { resetPageTours, setTips } from '../lib/tours.js';
 import { keepStorage, storageStatus } from '../lib/browserStorage.js';
+import { exportBackup } from '../lib/backup.js';
+import { mergeStudentData } from '../lib/cloud/plannerSync.js';
 
 export default function Settings() {
   const { state, update, applyRemote, replace, notify, userId, vault, openVault } = useStore();
   const tour = useTour();
+  const cloud = useCloud();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const me = state.users.find((u) => u.id === userId);
@@ -28,6 +32,28 @@ export default function Settings() {
     u.appearance = { ...(u.appearance || {}), ...patch };
   });
 
+  // Students, grades, seats and sub notes from a backup, into the classes this planner already has.
+  const importStudents = (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    file.text().then((t) => {
+      let data;
+      try {
+        data = JSON.parse(t);
+        if (!data.classes) throw new Error('bad');
+      } catch {
+        notify('That file is not a Teacher Planner backup.', true);
+        return;
+      }
+      const matching = state.classes.filter((c) => data.classes.some((x) => x.id === c.id)).length;
+      if (!matching) { notify('None of the classes in that backup are in this planner.', true); return; }
+      if (!window.confirm(`Bring in students, grades, seating charts and sub notes for ${matching} ${matching === 1 ? 'class' : 'classes'} from this backup? Student information already here for those classes is replaced.`)) return;
+      update((d) => { mergeStudentData(d, data); }, { separate: true });
+      notify(`Student information brought in for ${matching} ${matching === 1 ? 'class' : 'classes'}.`, { undo: true });
+    });
+  };
+
   const importBackup = (e) => {
     const file = e.target.files[0];
     e.target.value = '';
@@ -37,7 +63,8 @@ export default function Settings() {
         const data = JSON.parse(t);
         if (!data.years || !data.classes || !data.lessons) throw new Error('bad');
         if (!window.confirm('Replace all current data with this backup?')) return;
-        replace(data);
+        // This computer's sync records stay: the restored planner then counts as edited here and is saved online.
+        replace({ ...data, cloud: state.cloud });
         notify('Backup restored');
       } catch {
         notify('That file is not a Teacher Planner backup.', true);
@@ -161,15 +188,16 @@ export default function Settings() {
               </div>
             </>
           ) : (
-            <BrowserStorageNote lastBackup={state.lastBackup} />
+            <BrowserStorageNote lastBackup={state.lastBackup} savedOnline={cloud.savingOnline} />
           )}
           <div className="row wrap">
             <button className="primary" onClick={() => exportBackup(state, applyRemote)}>Export backup</button>
             <label className="btn">Import backup<input type="file" accept="application/json,.json" hidden onChange={importBackup} /></label>
+            <label className="btn" title="Students, grades, seating charts and sub notes for the classes in this planner">Import student information<input type="file" accept="application/json,.json" hidden onChange={importStudents} /></label>
           </div>
           <div className="row wrap">
-            <button onClick={() => { if (window.confirm('Replace everything with sample data?')) { replace(resetToDemo()); notify('Loaded the sample planner.', { undo: true }); } }}>Load sample data</button>
-            <button className="danger" onClick={() => { if (window.confirm('Erase everything and start fresh?')) { replace(resetToEmpty()); notify('Started a fresh planner.', { undo: true }); } }}>Start fresh</button>
+            <button onClick={() => { if (window.confirm(`Replace everything with sample data?${cloud.savingOnline ? ' Saving online stops on this computer; your plans saved online stay as they are.' : ''}`)) { replace(resetToDemo()); notify('Loaded the sample planner.', { undo: true }); } }}>Load sample data</button>
+            <button className="danger" onClick={() => { if (window.confirm(`Erase everything and start fresh?${cloud.savingOnline ? ' Saving online stops on this computer; your plans saved online stay as they are.' : ''}`)) { replace(resetToEmpty()); notify('Started a fresh planner.', { undo: true }); } }}>Start fresh</button>
           </div>
         </section>
       </div>
@@ -178,20 +206,14 @@ export default function Settings() {
   );
 }
 
-/** Download the whole planner as a backup file, and remember when. */
-export function exportBackup(state, applyRemote) {
-  download(`teacher-planner-backup-${today()}.json`, JSON.stringify(state), 'application/json');
-  applyRemote((d) => { d.lastBackup = today(); }, { history: false });
-}
-
 /** Browser: where the planner is kept, and whether the browser has promised to keep it. */
-function BrowserStorageNote({ lastBackup }) {
+function BrowserStorageNote({ lastBackup, savedOnline }) {
   const [status, setStatus] = useState(null);
   useEffect(() => { storageStatus().then(setStatus); }, []);
   const ask = async () => { await keepStorage(); setStatus(await storageStatus()); };
   return (
     <>
-      <p className="small">Your planner is saved in this browser on this computer{status?.usedMB ? ` (${status.usedMB} MB)` : ''}.</p>
+      <p className="small">Your planner is saved in this browser on this computer{status?.usedMB ? ` (${status.usedMB} MB)` : ''}.{savedOnline ? ' Your plans are also saved online in your account; student information is only here.' : ''}</p>
       {status && (status.kept ? (
         <p className="small muted">This browser has agreed to keep it, so it won’t be cleared to free up space. Clearing your browsing data or using another computer still starts you without it.</p>
       ) : (
@@ -199,7 +221,7 @@ function BrowserStorageNote({ lastBackup }) {
           This browser may clear it to free up space, or after a few weeks without a visit (Safari does this). <button className="link-btn" onClick={ask}>Ask the browser to keep it</button>
         </p>
       ))}
-      <p className="small muted">Last backup: <strong>{lastBackup ? formatDate(lastBackup) : 'never'}</strong>. Export a backup every week or two, and to move to another computer.</p>
+      <p className="small muted">Last backup: <strong>{lastBackup ? formatDate(lastBackup) : 'never'}</strong>. {savedOnline ? 'Export a backup every week or two to keep student information safe.' : <>Export a backup every week or two, and to move to another computer. Or <a href="#/settings/account">save your plans online</a>.</>}</p>
     </>
   );
 }

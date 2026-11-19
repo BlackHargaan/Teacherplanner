@@ -368,6 +368,8 @@ function schoolYearBounds(ref) {
 
 export function demoState() {
   const state = emptyState();
+  // Untouched sample data: not worth keeping (cleared by the teacher's first edit).
+  state.sample = true;
   const me = state.users[0];
   me.name = 'Ms. Rivera';
   me.email = 'rivera@school.example';

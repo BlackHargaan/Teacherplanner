@@ -25,6 +25,13 @@ The app checks for new versions at launch and every few hours, and teachers can 
 >
 > Both go away once the builds are signed (see *Releasing*).
 
+### In a web browser
+
+**[teachertechtools.org/app](https://teachertechtools.org/app/)** runs the same app in a browser. Nothing to install, so it also works on Chromebooks.
+- The planner is saved in that browser on that computer (IndexedDB, with no 5 MB cap). The app asks the browser to keep it, and **Settings → Data** shows whether the browser agreed and when the last backup was made. After the first week it reminds the teacher now and then to **Export backup**, because clearing browsing data erases the planner.
+- Signed-in teachers can turn on **Save my plans online** (see below), so their plans are in their account on every computer.
+- Each app release attaches `Teacher-Planner-web.zip`. The website repo's *Teacher Planner web app* workflow installs it into `app/` hourly (or when run by hand) and republishes the site.
+
 ### Your planner folder
 
 ```
@@ -44,7 +51,7 @@ Teacher Planner/
 
 ```bash
 npm install
-npm run dev        # browser version at http://localhost:5173 (saves to localStorage)
+npm run dev        # browser version at http://localhost:5173 (saves to IndexedDB)
 npm run desktop    # build and run the desktop app
 npm test           # schedule engine, sequencing, reports, CSV, iCalendar
 npm run dist:linux # build installers locally (also dist:win / dist:mac, on that OS)
@@ -113,6 +120,13 @@ Lessons are stored as an ordered sequence per class: lesson *n* is taught at the
   - Anyone else gets the bank automatically the first time they sign in with that email.
 - **Syncing:** changes sync on their own at sign-in, every couple of minutes, when the app is brought back to the front, and live when a teammate changes something. Edits made offline are sent when you're back online and are never overwritten by a download.
 - **Privacy:** only the shared banks go online (their sections and lessons). Rosters, grades, student notes and your **private lesson notes** stay on your computer. Files attached from your computer stay there too; links work for everyone.
+
+### Saving your own plans online
+- **Settings → Online account → Save my plans online** (off until the teacher turns it on). The planner is saved to the teacher's account as they work, one row per item (`planner_items`, readable only by its owner), and comes along wherever they sign in, in the desktop app or the browser.
+- **Student information never goes online.** Before upload, classes lose their roster, student notes, grades, standards scores and seat assignments. Notes to and from substitutes and files stored inside lessons stay on the computer too. Gradebook categories and assignment names, seating-chart layouts and lessons (including private lesson notes) are saved. To bring student information to another computer: **Export backup** there, then **Import student information** (Settings → Data), which fills in rosters, grades and seats for classes in both planners.
+- **Merging:** like team banks, each item's last-synced fingerprint is kept, so local edits are uploaded and never overwritten by a download. An item edited on two computers keeps the newer lesson (lessons record when they were edited) or this computer's version otherwise. Deleted items are kept online as empty tombstones so other computers delete them too.
+- **First sync on a computer:** with nothing online yet, the planner is uploaded. With nothing here (or only untouched sample data), the online planner is used. With plans in both, the teacher chooses: use the account's planner (a backup of this computer's downloads first; student information for matching classes stays) or replace it with this computer's.
+- **Stop saving online** keeps or deletes the online copy. The computer's own planner is untouched either way.
 - **Leaving or losing access:** owners can change access, remove people or stop sharing; members can leave. If you lose access, your copy stays read-only, and lessons you linked into your classes are kept.
 
 ### Lesson development
@@ -156,7 +170,8 @@ Lessons are stored as an ordered sequence per class: lesson *n* is taught at the
 - Google Drive: Drive-link attachments.
 
 ## Current limitations
-- **Your own planner lives on your computer.** It syncs between your computers through a cloud-drive folder, used by one computer at a time. Only lesson banks you share online and school profiles go through the server (Supabase); rosters, grades and private notes never do.
+- **Your own planner lives on your computer**, in a planner folder (desktop) or the browser. Saving online is optional; without it, the desktop app syncs between computers through a cloud-drive folder used by one computer at a time. Rosters, grades and student notes never go through the server (Supabase).
+- **Supabase's free plan pauses a project after about a week with little use**, which stops sign-in, sharing and saving online until it's restored from the dashboard (planners keep working, as they're saved locally). A paid plan avoids this.
 - **Shared classes and Shared Views are local.** Sharing a class with a colleague works within one planner folder, and Shared Views are opened or downloaded as pages rather than hosted online.
 - **Google integration doesn't use OAuth.** It relies on file export and share links rather than API sync, so there's no automatic Classroom posting or Drive picker yet.
 
@@ -169,7 +184,7 @@ Lessons are stored as an ordered sequence per class: lesson *n* is taught at the
 | `src/lib/reports.js` | Standards coverage, achievement, weighted grade averages |
 | `src/lib/ics.js` | iCalendar export and Google Calendar / Classroom links |
 | `src/pages/*` | One file per screen |
-| `src/lib/cloud/` | Online account, team-bank and school-profile sync: `sync.js` and `schoolSync.js` (pure merge/push logic), `backend.js` (Supabase calls), `CloudProvider.jsx` (when to sync) |
+| `src/lib/cloud/` | Online account, team-bank and school-profile sync: `sync.js`, `schoolSync.js` and `plannerSync.js` (pure merge/push logic), `backend.js` (Supabase calls), `CloudProvider.jsx` (when to sync) |
 | `supabase/migrations/` | Database tables and row-level security for sign-in and sharing |
 | `electron/main.cjs` | Desktop shell: planner folder, atomic saves, daily backups, file watching, attachments, menus |
 | `electron/updater.cjs` | Update checks, background download and restart-to-update (website download on Mac) |

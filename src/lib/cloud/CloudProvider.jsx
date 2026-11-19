@@ -7,6 +7,10 @@ import { applySnapshot, changesByBank, changesToPush, detachBank, fingerprint, m
 import { deleteBankLocally } from '../actions.js';
 import { uid } from '../model.js';
 import {
+  adoptOnlinePlanner, applyPlannerRows, hasPlans, markPlannerPushed, plannerChanges, plannerSync, replaceOnlinePlanner,
+  rowsHavePlans, savingOnline, startPlannerSync, stopPlannerSync,
+} from './plannerSync.js';
+import {
   applySchools, makeJoinCode, markSchoolsPushed, markSharedDayTypes, schoolData, schoolsToPush, unlinkSchool,
 } from './schoolSync.js';
 
@@ -17,13 +21,16 @@ const CHECK_DELAY_MS = 400;
 const MAX_ROUNDS = 3;
 
 const hasChanges = (ch) => ch.banks.length + ch.lessons.length + ch.deletes.length > 0;
-const anythingToPush = (state) => hasChanges(changesToPush(state)) || schoolsToPush(state).length > 0;
+const anythingToPush = (state, userId) => hasChanges(changesToPush(state)) || schoolsToPush(state).length > 0
+  || (savingOnline(state, userId) && plannerSync(state).linked && plannerChanges(state).length > 0);
 
 export function CloudProvider({ children }) {
   const { state, applyRemote, latest, notify } = useStore();
   const [session, setSession] = useState(null);
   const [status, setStatus] = useState(cloudConfigured ? 'starting' : 'off'); // off | starting | signed-out | syncing | synced | offline | error
   const [error, setError] = useState(null);
+  // First sync of this computer with an account that already has plans online: the teacher chooses.
+  const [plannerChoice, setPlannerChoice] = useState(null);
   const running = useRef(false);
   const lastSnap = useRef(null);
   const again = useRef(false);
@@ -35,6 +42,36 @@ export function CloudProvider({ children }) {
     api.getSession().then((s) => { setSession(s); if (!s) setStatus('signed-out'); }).catch(() => setStatus('offline'));
     return api.onAuthChange((s) => { setSession(s); if (!s) setStatus('signed-out'); });
   }, []);
+
+  // ---- the teacher's own planner (when saving online is on): pull, then push
+  const syncPlanner = useCallback(async () => {
+    const p = plannerSync(latest.current);
+    if (!savingOnline(latest.current, user.id)) return;
+    if (!p.linked) {
+      const rows = await api.fetchPlannerRows(null);
+      if (!rowsHavePlans(rows)) {
+        applyRemote((d) => replaceOnlinePlanner(d, rows)); // nothing online yet: this computer's planner goes up
+      } else if (!hasPlans(latest.current)) {
+        applyRemote((d) => adoptOnlinePlanner(d, rows)); // nothing here yet: take the online one
+        notify('Your planner was loaded from your account.');
+      } else {
+        setPlannerChoice({ rows });
+        return;
+      }
+    } else {
+      const rows = await api.fetchPlannerRows(p.cursor);
+      if (rows.length) {
+        let result = null;
+        applyRemote((d) => { const r = applyPlannerRows(d, rows); result ||= r; });
+        if (result?.conflicts) notify('Some items were changed on two computers. The newest version was kept.');
+      }
+    }
+    const changes = plannerChanges(latest.current);
+    if (!changes.length) return;
+    const { sent, tooBig } = await api.pushPlannerRows(changes);
+    applyRemote((d) => markPlannerPushed(d, [...sent, ...tooBig]));
+    if (tooBig.length) notify(`${tooBig.length === 1 ? 'One item is' : `${tooBig.length} items are`} too large to save online (often a big pasted image), so ${tooBig.length === 1 ? 'it stays' : 'they stay'} on this computer only.`, true);
+  }, [user, applyRemote, latest, notify]);
 
   // ---- one sync round: pull everything, then push local edits. Pulling
   // first means roles, removals, deletions and a change of account are known
@@ -78,6 +115,7 @@ export function CloudProvider({ children }) {
         }
       } while (again.current && rounds < MAX_ROUNDS);
       if (refused) throw refused;
+      await syncPlanner();
       setError(null);
       setStatus('synced');
     } catch (err) {
@@ -86,7 +124,7 @@ export function CloudProvider({ children }) {
     } finally {
       running.current = false;
     }
-  }, [user, applyRemote, latest]);
+  }, [user, applyRemote, latest, syncPlanner]);
 
   // ---- when to sync
   const plannerLoaded = !!state;
@@ -114,7 +152,7 @@ export function CloudProvider({ children }) {
   const [pending, setPending] = useState(false);
   useEffect(() => {
     if (!user || !state) { setPending(false); return undefined; }
-    const t = setTimeout(() => setPending(anythingToPush(latest.current)), CHECK_DELAY_MS);
+    const t = setTimeout(() => setPending(anythingToPush(latest.current, user.id)), CHECK_DELAY_MS);
     return () => clearTimeout(t);
   }, [state, user, latest]);
   useEffect(() => {
@@ -141,6 +179,30 @@ export function CloudProvider({ children }) {
       if (updated) setSession((s) => (s ? { ...s, user: updated } : s));
     },
     syncNow: sync,
+
+    // ---- saving the teacher's own planner online
+    /** Turn on saving this planner (minus student information) to the account. */
+    startSavingOnline: async () => {
+      applyRemote((d) => startPlannerSync(d, user.id));
+      await sync();
+    },
+    /** Stop saving online. With deleteOnline, the online copy is erased too. */
+    stopSavingOnline: async ({ deleteOnline = false } = {}) => {
+      if (deleteOnline) await api.deletePlanner();
+      applyRemote((d) => {
+        stopPlannerSync(d);
+        if (deleteOnline && d.cloud?.planner) { d.cloud.planner.shadow = {}; d.cloud.planner.cursor = null; d.cloud.planner.linked = false; }
+      });
+    },
+    /** Answer the first-sync question: 'online' (use the account's planner), 'mine' (upload this one) or 'cancel'. */
+    resolvePlannerChoice: async (answer) => {
+      const choice = plannerChoice;
+      setPlannerChoice(null);
+      if (!choice) return;
+      if (answer === 'cancel') { applyRemote((d) => stopPlannerSync(d)); return; }
+      applyRemote((d) => (answer === 'online' ? adoptOnlinePlanner(d, choice.rows) : replaceOnlinePlanner(d, choice.rows)));
+      await sync();
+    },
 
     /** Share a local bank online (the signed-in teacher becomes its owner). */
     publishBank: async (bankId) => {
@@ -239,8 +301,9 @@ export function CloudProvider({ children }) {
       await api.removeSchoolMember(year.school.id, userId);
       await sync();
     },
-  }), [user, sync, applyRemote, notify, latest]);
+  }), [user, sync, applyRemote, notify, latest, plannerChoice]);
 
+  const saving = Boolean(state && user && savingOnline(state, user.id));
   const value = useMemo(() => ({
     configured: cloudConfigured,
     user,
@@ -249,8 +312,10 @@ export function CloudProvider({ children }) {
     error,
     lastSync: state?.cloud?.lastSync || null,
     pending,
+    savingOnline: saving,
+    plannerChoice,
     ...actions,
-  }), [user, status, error, state?.cloud?.lastSync, pending, actions]);
+  }), [user, status, error, state?.cloud?.lastSync, pending, actions, saving, plannerChoice]);
 
   return <CloudContext.Provider value={value}>{children}</CloudContext.Provider>;
 }

@@ -226,3 +226,41 @@ describe('school profiles — row-level security', () => {
     expect((await as(DAN, 'select count(*)::int as n from school_members'))[0].n).toBe(0);
   });
 });
+
+describe('saved planners — row-level security', () => {
+  const upsert = `insert into planner_items (kind, item_id, data) values ($1, $2, $3)
+    on conflict (user_id, kind, item_id) do update set data = excluded.data, deleted = false returning kind, item_id`;
+
+  it('lets a teacher save and read back their own planner (insert … on conflict … returning)', async () => {
+    expect(await as(ANA, upsert, ['lesson', 'l-1', { title: 'Cells' }])).toEqual([{ kind: 'lesson', item_id: 'l-1' }]);
+    await as(ANA, upsert, ['lesson', 'l-1', { title: 'Cells, part 2' }]);
+    const rows = await as(ANA, 'select user_id, data from planner_items');
+    expect(rows).toEqual([{ user_id: ANA, data: { title: 'Cells, part 2' } }]);
+  });
+
+  it('keeps every planner private, even from teammates and anonymous visitors', async () => {
+    expect(await as(BEN, 'select * from planner_items')).toEqual([]);
+    expect(await as(null, 'select * from planner_items').catch(() => [])).toEqual([]);
+    await as(BEN, "update planner_items set data = '{\"title\":\"hacked\"}'");
+    await as(BEN, 'delete from planner_items');
+    expect((await as(ANA, 'select data from planner_items'))[0].data.title).toBe('Cells, part 2');
+  });
+
+  it('never lets anyone write into someone else’s planner or hand a row over', async () => {
+    expect(await fails(as(BEN, `insert into planner_items (user_id, kind, item_id, data) values ('${ANA}', 'lesson', 'x', '{}')`))).toBe(true);
+    await as(ANA, `update planner_items set user_id = '${BEN}'`);
+    expect((await as(ANA, 'select count(*)::int as n from planner_items'))[0].n).toBe(1);
+    expect(await as(BEN, 'select * from planner_items')).toEqual([]);
+  });
+
+  it('sets the time on the server, and keeps deletions as tombstones', async () => {
+    const before = (await as(ANA, 'select updated_at from planner_items'))[0].updated_at;
+    await as(ANA, "update planner_items set data = null, deleted = true, updated_at = '2000-01-01' where item_id = 'l-1'");
+    const row = (await as(ANA, 'select data, deleted, updated_at from planner_items'))[0];
+    expect(row.deleted).toBe(true);
+    expect(row.data).toBe(null);
+    expect(new Date(row.updated_at) >= new Date(before)).toBe(true);
+    expect(await fails(as(ANA, "insert into planner_items (kind, item_id) values ('lesson', 'empty')"))).toBe(true);
+    expect(await fails(as(ANA, "insert into planner_items (kind, item_id, data) values ('students', 'x', '{}')"))).toBe(true);
+  });
+});

@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useCloud } from '../lib/cloud/CloudProvider.jsx';
 import { useStore } from '../lib/store.jsx';
-import { Field } from './ui.jsx';
+import { Field, Modal } from './ui.jsx';
+import { host } from '../lib/store.jsx';
+import { exportBackup } from '../lib/backup.js';
 
 const friendly = (err) => {
   const msg = String(err?.message || err || '');
@@ -100,8 +102,8 @@ export function AccountCard() {
       <h2>Online account</h2>
       {!cloud.user ? (
         <>
-          <p className="small">Sign in to share lesson banks with your team. Only lesson banks you choose to share go online — rosters, grades, student notes and your private lesson notes always stay on this computer.</p>
-          <SignInForm onSignedIn={() => notify('Signed in. Your shared lesson banks will appear under Collaborate.')} />
+          <p className="small">Sign in to save your plans online, so they’re on every computer you use, and to share lesson banks with your team. Student names, grades, seating charts and student notes always stay on this computer.</p>
+          <SignInForm onSignedIn={() => notify(host ? 'Signed in. Your shared lesson banks will appear under Collaborate.' : 'Signed in. Turn on “Save my plans online” below to keep your plans safe in your account.')} />
         </>
       ) : (
         <>
@@ -122,9 +124,106 @@ export function AccountCard() {
             <button onClick={() => cloud.syncNow()} disabled={cloud.status === 'syncing'}>Sync now</button>
             <button onClick={() => cloud.signOut()}>Sign out</button>
           </div>
+          <SavingOnline />
         </>
       )}
     </section>
+  );
+}
+
+/** What goes online when saving is on, and what never does. */
+function WhatGoesOnline() {
+  return (
+    <div className="online-split small">
+      <div>
+        <strong>Saved online</strong>
+        <p className="muted">School years and calendars, classes and their schedules, lessons (including your private lesson notes), templates, lesson banks, views, and gradebook categories and assignment names.</p>
+      </div>
+      <div>
+        <strong>Stays on this computer</strong>
+        <p className="muted">Student names and rosters, student notes, grades and standards scores, who sits where, notes to and from substitutes, and files stored inside lessons (links to Google Drive travel).</p>
+      </div>
+    </div>
+  );
+}
+
+function SavingOnline() {
+  const cloud = useCloud();
+  const { state, notify } = useStore();
+  const [stopping, setStopping] = useState(false);
+  return (
+    <div className="saving-online" id="save-online">
+      <h3>Save my plans online</h3>
+      {cloud.savingOnline ? (
+        <>
+          <p className="small"><span className="dot sync-synced" /> On. Your plans are saved to <strong>{cloud.email}</strong> as you work, and sign-in on another computer or browser brings them along.</p>
+          <WhatGoesOnline />
+          <p className="small muted">To bring student information to another computer, use <strong>Export backup</strong> on this one and <strong>Import student information</strong> on the other (both under Settings → Data).</p>
+          <button onClick={() => setStopping(true)}>Stop saving online…</button>
+        </>
+      ) : (
+        <>
+          <p className="small">Keep your plans in your account, so they’re safe if this computer or browser is lost or cleared, and open them anywhere you sign in.</p>
+          <WhatGoesOnline />
+          <button className="primary" onClick={() => cloud.startSavingOnline().catch(() => notify('Couldn’t reach your account. Try again in a moment.', true))}>Save my plans online</button>
+        </>
+      )}
+      {stopping && (
+        <Modal
+          title="Stop saving online?"
+          onClose={() => setStopping(false)}
+          footer={(
+            <>
+              <button onClick={() => setStopping(false)}>Cancel</button>
+              <button onClick={async () => { setStopping(false); await cloud.stopSavingOnline(); notify('Your plans are no longer saved online from this computer.'); }}>Stop, keep the online copy</button>
+              <button className="danger" onClick={async () => {
+                setStopping(false);
+                try { await cloud.stopSavingOnline({ deleteOnline: true }); notify('Your online copy was deleted. Your planner is still on this computer.'); } catch { notify('Couldn’t reach your account to delete it. Try again.', true); }
+              }}>Stop and delete the online copy</button>
+            </>
+          )}
+        >
+          <p>Your planner stays on this computer either way. Keep the online copy if you use other computers that still save to it.</p>
+          {state && <p className="small muted">Deleting removes your plans from your account for good, on every computer, but not from any computer’s own planner.</p>}
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+/**
+ * First time this computer saves online to an account that already has a
+ * planner: use that one, or replace it with this computer's.
+ */
+export function PlannerChoiceDialog() {
+  const cloud = useCloud();
+  const { state, applyRemote } = useStore();
+  if (!cloud.plannerChoice || !state) return null;
+  const online = cloud.plannerChoice.rows.filter((r) => !r.deleted);
+  const count = (kind, list) => list.filter((r) => r.kind === kind).length;
+  const onlineClasses = count('class', online);
+  const onlineLessons = count('lesson', online);
+  return (
+    <Modal
+      title="Your account already has a planner"
+      onClose={() => cloud.resolvePlannerChoice('cancel')}
+      footer={(
+        <>
+          <button onClick={() => cloud.resolvePlannerChoice('cancel')}>Not now</button>
+          <button onClick={() => {
+            if (window.confirm('Replace the planner saved in your account with this computer’s? Your other computers will switch to this one too.')) cloud.resolvePlannerChoice('mine');
+          }}>Replace it with this computer’s</button>
+          <button className="primary" onClick={() => {
+            exportBackup(state, applyRemote); // this computer's planner, just in case
+            cloud.resolvePlannerChoice('online');
+          }}>Use the planner from my account</button>
+        </>
+      )}
+    >
+      <p>Your account has <strong>{onlineClasses} {onlineClasses === 1 ? 'class' : 'classes'}</strong> and <strong>{onlineLessons} {onlineLessons === 1 ? 'lesson' : 'lessons'}</strong> saved online. This computer has <strong>{state.classes.length} {state.classes.length === 1 ? 'class' : 'classes'}</strong> and <strong>{Object.keys(state.lessons).length} lessons</strong>.</p>
+      <p><strong>Use the planner from my account</strong> (usually right): this computer switches to it. A backup of this computer’s planner downloads first, and student information for classes in both stays.</p>
+      <p className="small muted">Replacing makes this computer’s planner the one in your account, on every computer.</p>
+    </Modal>
   );
 }
 
@@ -134,7 +233,7 @@ export function CloudStatus() {
   if (!cloud.configured) return null;
   const label = cloud.user ? (cloud.pending && !['offline', 'error'].includes(cloud.status) ? 'Saving…' : STATUS_TEXT[cloud.status]) : 'Sign in';
   return (
-    <a className={`cloud-pill sync-${cloud.user ? cloud.status : 'signed-out'}`} href="#/settings/account" title={cloud.user ? `Online sharing: ${STATUS_TEXT[cloud.status]}` : 'Sign in to share lesson banks with your team'}>
+    <a className={`cloud-pill sync-${cloud.user ? cloud.status : 'signed-out'}`} href="#/settings/account" title={cloud.user ? `Online: ${STATUS_TEXT[cloud.status]}` : 'Sign in to save your plans online and share lesson banks'}>
       <span aria-hidden="true">☁</span> {cloud.user ? (cloud.status === 'synced' && !cloud.pending ? 'Synced' : label) : 'Sign in'}
     </a>
   );

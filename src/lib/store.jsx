@@ -155,6 +155,7 @@ export function StoreProvider({ children }) {
     const prev = latest.current;
     const draft = cloneState(prev);
     fn(draft);
+    delete draft.sample; // the teacher has started using it
     history.current = record(history.current, prev, Date.now(), separate);
     latest.current = draft;
     setState(draft);

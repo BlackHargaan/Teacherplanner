@@ -202,13 +202,65 @@ export async function removeSchoolMember(schoolId, userId) {
   check(await (await supabase()).from('school_members').delete().eq('school_id', schoolId).eq('user_id', userId));
 }
 
+// ---- the teacher's own planner
+
+/**
+ * Planner rows changed since `cursor` (the newest updated_at seen), or all of
+ * them. Looks back a few seconds past the cursor: a save that was still in
+ * progress at the last download may carry a slightly earlier time.
+ */
+export async function fetchPlannerRows(cursor) {
+  const db = await supabase();
+  const since = cursor ? new Date(Date.parse(cursor) - 10000).toISOString() : null;
+  return fetchAll(() => {
+    let q = db.from('planner_items').select('kind, item_id, data, deleted, updated_at');
+    if (since) q = q.gt('updated_at', since);
+    return q.order('updated_at').order('kind').order('item_id');
+  });
+}
+
+const tooBig = (err) => err?.code === '23514' || /check constraint/i.test(String(err?.message));
+
+/**
+ * Upload planner rows (from plannerChanges). Returns { sent, tooBig }: rows
+ * over the size limit (a huge pasted image, a whole state's standards) are
+ * left out instead of stopping the rest.
+ */
+export async function pushPlannerRows(rows) {
+  const db = await supabase();
+  const sent = [];
+  const skipped = [];
+  const send = async (batch) => {
+    const payload = batch.map(({ kind, item_id: itemId, data, deleted }) => ({ kind, item_id: itemId, data, deleted }));
+    check(await db.from('planner_items').upsert(payload, { onConflict: 'user_id,kind,item_id' }));
+  };
+  for (let i = 0; i < rows.length; i += 100) {
+    const batch = rows.slice(i, i + 100);
+    try {
+      await send(batch);
+      sent.push(...batch);
+    } catch (err) {
+      if (!tooBig(err)) throw err;
+      for (const row of batch) { // find the one that's too big
+        try { await send([row]); sent.push(row); } catch (e) { if (!tooBig(e)) throw e; skipped.push(row); }
+      }
+    }
+  }
+  return { sent, tooBig: skipped };
+}
+
+/** Delete this account's whole online planner (turning saving online off for good). */
+export async function deletePlanner() {
+  check(await (await supabase()).from('planner_items').delete().not('kind', 'is', null));
+}
+
 /** Live notifications when a teammate changes something. */
 export function subscribe(onChange) {
   let channel = null; let stopped = false;
   supabase().then((db) => {
     if (stopped) return;
     channel = db.channel('teacher-planner-banks');
-    for (const table of ['banks', 'bank_lessons', 'bank_members', 'schools', 'school_members']) {
+    for (const table of ['banks', 'bank_lessons', 'bank_members', 'schools', 'school_members', 'planner_items']) {
       channel.on('postgres_changes', { event: '*', schema: 'public', table }, onChange);
     }
     channel.subscribe();

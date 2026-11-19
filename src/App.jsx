@@ -27,6 +27,8 @@ import { Menu } from './components/ui.jsx';
 import { TOURS } from './lib/tours.js';
 import { yearProgress } from './lib/yearProgress.js';
 import { formatDate, today } from './lib/dates.js';
+import { backupReminder } from './lib/browserStorage.js';
+import { exportBackup } from './pages/Settings.jsx';
 
 const PAGES = [
   ['planner', 'Planner', Planner],
@@ -49,7 +51,7 @@ function editingText() {
 }
 
 export default function App() {
-  const { state, update, undo, redo, notify, toast, year, loadError } = useStore();
+  const { state, update, applyRemote, undo, redo, notify, toast, year, loadError, latest } = useStore();
   const [route, param] = useHashRoute();
   const tour = useTour();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -62,6 +64,18 @@ export default function App() {
   }, [menuOpen]);
   const appearance = state ? currentUser(state)?.appearance : undefined;
   useEffect(() => { applyAppearance(appearance); }, [appearance?.palette, appearance?.mode]);
+  // Browser: the planner lives only in this browser, so nudge now and then to download a backup.
+  const loaded = Boolean(state);
+  useEffect(() => {
+    if (host || !loaded || route === 'view' || route === 'print') return undefined;
+    const t = setTimeout(() => {
+      const s = latest.current;
+      if (s && backupReminder(s.lastBackup, today())) {
+        notify('Your planner is saved only in this browser. Download a backup now and then.', { action: { label: 'Back up now', run: () => exportBackup(latest.current, applyRemote) } });
+      }
+    }, 8000);
+    return () => clearTimeout(t);
+  }, [loaded]); // eslint-disable-line react-hooks/exhaustive-deps
   // Desktop menu items (e.g. Help → Check for Updates…) can open a page.
   useEffect(() => host?.onNavigate?.((path) => { window.location.hash = `#/${path}`; }), []);
 
@@ -95,6 +109,7 @@ export default function App() {
 
   if (host && loadError) return <><LoadError /><Toast toast={toast} /></>;
   if (host && !state) return <><Welcome /><Toast toast={toast} /></>;
+  if (!state) return <Toast toast={toast} />; // browser: still reading the saved planner
   if (route === 'view') return <>{<Viewer id={param} />}<Toast toast={toast} /></>;
   if (route === 'print') return <><PrintPage /><Toast toast={toast} /></>;
   const [id, , Page] = route === 'search' ? ['search', 'Search', Search] : PAGES.find(([p]) => p === route) || PAGES[0];

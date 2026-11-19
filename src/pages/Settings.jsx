@@ -10,6 +10,7 @@ import { today } from '../lib/dates.js';
 import { MODES, PALETTES, paletteById } from '../data/themes.js';
 import { useTour } from '../components/Tour.jsx';
 import { resetPageTours, setTips } from '../lib/tours.js';
+import { keepStorage, storageStatus } from '../lib/browserStorage.js';
 
 export default function Settings() {
   const { state, update, applyRemote, replace, notify, userId, vault, openVault } = useStore();
@@ -160,10 +161,10 @@ export default function Settings() {
               </div>
             </>
           ) : (
-            <p className="small muted">Everything is stored in this browser. Export a backup regularly, or to move to another computer.</p>
+            <BrowserStorageNote lastBackup={state.lastBackup} />
           )}
           <div className="row wrap">
-            <button className="primary" onClick={() => download(`teacher-planner-backup-${today()}.json`, JSON.stringify(state), 'application/json')}>Export backup</button>
+            <button className="primary" onClick={() => exportBackup(state, applyRemote)}>Export backup</button>
             <label className="btn">Import backup<input type="file" accept="application/json,.json" hidden onChange={importBackup} /></label>
           </div>
           <div className="row wrap">
@@ -174,6 +175,32 @@ export default function Settings() {
       </div>
       {restoring && <RestoreDialog onClose={() => setRestoring(false)} />}
     </div>
+  );
+}
+
+/** Download the whole planner as a backup file, and remember when. */
+export function exportBackup(state, applyRemote) {
+  download(`teacher-planner-backup-${today()}.json`, JSON.stringify(state), 'application/json');
+  applyRemote((d) => { d.lastBackup = today(); }, { history: false });
+}
+
+/** Browser: where the planner is kept, and whether the browser has promised to keep it. */
+function BrowserStorageNote({ lastBackup }) {
+  const [status, setStatus] = useState(null);
+  useEffect(() => { storageStatus().then(setStatus); }, []);
+  const ask = async () => { await keepStorage(); setStatus(await storageStatus()); };
+  return (
+    <>
+      <p className="small">Your planner is saved in this browser on this computer{status?.usedMB ? ` (${status.usedMB} MB)` : ''}.</p>
+      {status && (status.kept ? (
+        <p className="small muted">This browser has agreed to keep it, so it won’t be cleared to free up space. Clearing your browsing data or using another computer still starts you without it.</p>
+      ) : (
+        <p className="small muted">
+          This browser may clear it to free up space, or after a few weeks without a visit (Safari does this). <button className="link-btn" onClick={ask}>Ask the browser to keep it</button>
+        </p>
+      ))}
+      <p className="small muted">Last backup: <strong>{lastBackup ? formatDate(lastBackup) : 'never'}</strong>. Export a backup every week or two, and to move to another computer.</p>
+    </>
   );
 }
 

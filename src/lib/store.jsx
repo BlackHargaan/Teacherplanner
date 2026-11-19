@@ -2,21 +2,22 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { cloneState, demoState, emptyState, currentYear, yearClasses } from './model.js';
 import { buildCalendar } from './schedule.js';
 import { applyToHistory, createHistory, record, undo as undoStep, redo as redoStep } from './history.js';
+import { keepStorage, loadPlanner, onOtherTabSave, savePlanner } from './browserStorage.js';
 
-const KEY = 'teacher-planner:v1';
 export const StoreContext = createContext(null);
 
 /** Desktop app bridge (Electron preload); undefined when running in a browser. */
 export const host = typeof window !== 'undefined' ? window.plannerHost : undefined;
 
-function loadLocal() {
+/** Browser: the saved planner; sample data on a first visit; null when it can't be read. */
+async function loadBrowser({ firstLoad }) {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = await loadPlanner();
     if (raw) return migrate(JSON.parse(raw));
   } catch {
-    /* fall through to demo data */
+    return firstLoad ? demoState() : null;
   }
-  return demoState();
+  return firstLoad ? demoState() : null;
 }
 
 /** Fill in any fields added after the data was first saved. */
@@ -29,8 +30,8 @@ export function migrate(data) {
 }
 
 export function StoreProvider({ children }) {
-  // In the desktop app state starts empty until the planner folder is read.
-  const [state, setState] = useState(() => (host ? null : loadLocal()));
+  // State starts empty until the planner folder (desktop) or browser storage is read.
+  const [state, setState] = useState(null);
   const [vault, setVault] = useState(null);
   // Desktop: planner.json exists but isn't valid (damaged, or half-synced). Nothing is saved until the teacher decides.
   const [loadError, setLoadError] = useState(null);
@@ -97,25 +98,23 @@ export function StoreProvider({ children }) {
     return () => { off(); window.removeEventListener('beforeunload', flush); };
   }, [openVault]);
 
-  // ---- browser: another tab (or an "Open view" tab) saved the planner
+  // ---- browser: load, then follow saves made in other tabs (or an "Open view" tab)
   useEffect(() => {
     if (host) return undefined;
-    const onStorage = (e) => {
-      if (e.key !== KEY || e.storageArea !== localStorage || e.newValue == null) return;
-      let next;
-      try {
-        next = migrate(JSON.parse(e.newValue));
-      } catch {
-        return;
-      }
-      clearTimeout(saveTimer.current); // the other tab's copy is newer; don't write ours over it
+    let live = true;
+    const load = async (fromOtherTab) => {
+      const next = await loadBrowser({ firstLoad: !fromOtherTab });
+      if (!live || !next) return; // another tab's copy that can't be read: keep what's on screen
+      if (fromOtherTab) clearTimeout(saveTimer.current); // the other tab's copy is newer; don't write ours over it
       skipSave.current = true; // just loaded, nothing to save back
       history.current = createHistory(); // undo steps from before would roll back the other tab's work
       latest.current = next;
       setState(next);
     };
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+    load(false);
+    keepStorage();
+    const off = onOtherTabSave(() => load(true));
+    return () => { live = false; off(); };
   }, []);
 
   // ---- persist
@@ -129,7 +128,7 @@ export function StoreProvider({ children }) {
           await host.save(JSON.stringify(state, null, 1));
           skipSave.current = false;
         } else {
-          localStorage.setItem(KEY, JSON.stringify(state));
+          await savePlanner(JSON.stringify(state));
         }
       } catch {
         setToast({

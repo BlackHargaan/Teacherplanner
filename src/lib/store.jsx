@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { cloneState, demoState, emptyState, currentYear, yearClasses } from './model.js';
+import { cloneState, currentUser, demoState, emptyState, currentYear, yearClasses } from './model.js';
 import { buildCalendar } from './schedule.js';
 import { applyToHistory, createHistory, record, undo as undoStep, redo as redoStep } from './history.js';
 import { keepStorage, loadPlanner, onOtherTabSave, savePlanner } from './browserStorage.js';
@@ -225,9 +225,22 @@ export function useStore() {
   return useContext(StoreContext);
 }
 
-export function resetToDemo() {
-  return demoState();
+/**
+ * Swapping in the sample or an empty planner keeps the teacher's own
+ * settings: how the app looks and which tours they've seen.
+ */
+function keepPersonal(next, prev) {
+  const mine = prev && currentUser(prev);
+  const theirs = currentUser(next);
+  if (mine && theirs) {
+    if (mine.appearance) theirs.appearance = structuredClone(mine.appearance);
+    if (mine.tutorial) theirs.tutorial = structuredClone(mine.tutorial);
+  }
+  return next;
 }
-export function resetToEmpty() {
-  return emptyState();
+export function resetToDemo(prev) {
+  return keepPersonal(demoState(), prev);
+}
+export function resetToEmpty(prev) {
+  return keepPersonal(emptyState(), prev);
 }

@@ -53,7 +53,7 @@ export default function Planner() {
   if (visible.length === 0 && !editing) {
     return (
       <div className="page planner">
-        <SetupPanel year={year} hasClasses={classes.length > 0} onSample={() => { replace(resetToDemo()); notify('Loaded the sample planner. Look around; nothing here is yours yet.'); }} />
+        <SetupPanel year={year} hasClasses={classes.length > 0} onSample={() => { replace(resetToDemo(state)); notify('Loaded the sample planner. Look around; nothing here is yours yet.'); }} />
       </div>
     );
   }
@@ -67,7 +67,7 @@ export default function Planner() {
       {state.sampleData && (
         <div className="sample-banner no-print" role="status">
           <span><strong>This is a sample planner.</strong> Click around and change anything; none of it is yours.</span>
-          <button className="primary" onClick={() => { if (window.confirm('Clear the sample and start your own planner?')) { replace(resetToEmpty()); notify('Started your own planner.', { undo: true }); } }}>Start my own planner</button>
+          <button className="primary" onClick={() => { if (window.confirm('Clear the sample and start your own planner?')) { replace(resetToEmpty(state)); notify('Started your own planner.', { undo: true }); } }}>Start my own planner</button>
         </div>
       )}
       <div className="toolbar no-print">

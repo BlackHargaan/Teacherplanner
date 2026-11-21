@@ -28,14 +28,22 @@ export const TOURS = {
       },
       {
         route: 'planner',
+        target: '.setup-steps',
+        when: 'noClasses',
+        title: 'Start here',
+        body: 'Two steps get your planner going: set up your school year, then add the classes you teach. The next steps show you where each one lives.',
+      },
+      {
+        route: 'planner',
         target: '.planner .toolbar',
-        optional: true, // an empty planner shows its setup steps instead
+        when: 'hasClasses',
         title: 'The Planner',
         body: 'The title says which week you’re looking at; click it to jump to a date, or use the arrows and Today. Switch between Week, Day and one class’s lessons in order, and use View options to show details or hide a class.',
       },
       {
         route: 'planner',
         target: ['.planbook .meeting', '.week-grid .meeting'],
+        when: 'hasClasses',
         optional: true,
         title: 'Lessons flow onto your schedule',
         body: 'Each class’s lessons are kept in order and land on the days that class meets. Click a lesson to open it. Drag it to another day to move it, or onto another class to copy it.',
@@ -43,6 +51,7 @@ export const TOURS = {
       {
         route: 'planner',
         target: ['.pb-day .menu', '.day-head .menu'],
+        when: 'hasClasses',
         optional: true,
         title: 'When a day changes',
         body: 'Snow day? Assembly? Use a day’s ⋯ menu to cancel it or give it a different schedule. Every later lesson shifts for you, so nothing gets lost.',
@@ -78,6 +87,7 @@ export const TOURS = {
 
   planner: {
     title: 'The Planner',
+    when: 'hasClasses', // an empty planner is its setup screen; the tour waits for a week to show
     steps: [
       { route: 'planner', target: '.planner .toolbar .tabs', title: 'Three ways to look', body: 'Week is your plan book, a row for each class and a column for each day. Day shows one day in more room, and Class list shows one class’s lessons in order, where you can reorder them.' },
       { route: 'planner', target: '.planner .toolbar .view-options', optional: true, title: 'View options', body: 'Show or hide each lesson’s details, and hide a class for now, for example to focus on one subject.' },
@@ -175,8 +185,21 @@ export const TOURS = {
   },
 };
 
-/** The page tour for a route, if there is one. */
-export const pageTourFor = (route) => (route && route !== 'start' && TOURS[route] ? route : null);
+/**
+ * Steps and tours can apply only with or without classes (when: 'hasClasses' |
+ * 'noClasses'): an empty planner is a setup screen, with no week to point at.
+ */
+const applies = (item, ctx) => !item.when || (item.when === 'hasClasses' ? ctx.hasClasses : !ctx.hasClasses);
+
+/** The steps of a tour that apply right now (none if the tour itself doesn't). */
+export function stepsFor(tourId, ctx = { hasClasses: true }) {
+  const tour = TOURS[tourId];
+  if (!tour || !applies(tour, ctx)) return [];
+  return tour.steps.filter((step) => applies(step, ctx));
+}
+
+/** The page tour for a route, if there is one (and it applies). */
+export const pageTourFor = (route, ctx = { hasClasses: true }) => (route && route !== 'start' && TOURS[route] && stepsFor(route, ctx).length ? route : null);
 
 const progress = (user) => user?.tutorial || {};
 
@@ -187,8 +210,8 @@ export const shouldOfferStart = (user) => !progress(user).seen?.start;
  * Offer a page's tour the first time the teacher opens it: not before the
  * getting-started tour was seen, not if page tips are turned off, and only once.
  */
-export function shouldOfferPage(user, route) {
-  const id = pageTourFor(route);
+export function shouldOfferPage(user, route, ctx) {
+  const id = pageTourFor(route, ctx);
   const p = progress(user);
   return Boolean(id && p.seen?.start && p.tips !== false && !p.seen?.[id]);
 }

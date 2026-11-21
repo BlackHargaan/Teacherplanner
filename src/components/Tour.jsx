@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useStore } from '../lib/store.jsx';
 import { currentUser } from '../lib/model.js';
 import { useHashRoute, navigate } from '../lib/router.js';
-import { TOURS, markTour, pageTourFor, placeBox, shouldOfferPage, shouldOfferStart } from '../lib/tours.js';
+import { TOURS, markTour, pageTourFor, placeBox, shouldOfferPage, shouldOfferStart, stepsFor } from '../lib/tours.js';
 
 const TourContext = createContext({ start: () => {}, pageTour: null });
 export const useTour = () => useContext(TourContext);
@@ -18,7 +18,9 @@ const PAGES_WITHOUT_TOURS = new Set(['view', 'print']);
  * the ? menu, the Help menu or Settings.
  */
 export function TourProvider({ children }) {
-  const { state, applyRemote, loadError } = useStore();
+  const { state, applyRemote, loadError, classes } = useStore();
+  // Which steps apply: an empty planner is a setup screen, so week-view steps wait for classes.
+  const ctx = { hasClasses: (classes || []).length > 0 };
   const [page] = useHashRoute();
   const route = page || 'planner';
   const [active, setActive] = useState(null); // { id, index, dir }
@@ -29,7 +31,14 @@ export function TourProvider({ children }) {
   // Kept with the teacher's planner (and in every undo step, so Undo never
   // brings a finished tour back).
   const record = useCallback((id, how) => applyRemote((d) => markTour(currentUser(d), id, how)), [applyRemote]);
-  const start = useCallback((id) => { setOffer(null); setActive({ id, index: 0, dir: 1 }); }, []);
+  const ctxRef = useRef(ctx);
+  ctxRef.current = ctx;
+  // The steps are chosen when the tour starts, so the count stays put while it runs.
+  const start = useCallback((id) => {
+    setOffer(null);
+    const steps = stepsFor(id, ctxRef.current);
+    if (steps.length) setActive({ id, steps, index: 0, dir: 1 });
+  }, []);
 
   // First launch: open with the welcome step, which asks before touring.
   const offeredStart = useRef(false);
@@ -42,7 +51,7 @@ export function TourProvider({ children }) {
   // First visit to a page: a small, non-blocking offer.
   useEffect(() => {
     setOffer(null);
-    if (!ready || active || !shouldOfferPage(user, route)) return;
+    if (!ready || active || !shouldOfferPage(user, route, ctx)) return;
     setOffer(route);
     record(route, 'offered');
   }, [route, ready]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -51,14 +60,14 @@ export function TourProvider({ children }) {
     setActive((a) => { if (a) record(a.id, how); return null; });
   }, [record]);
 
-  const value = { start, pageTour: pageTourFor(route), active: Boolean(active) };
+  const value = { start, pageTour: pageTourFor(route, ctx), active: Boolean(active) };
   return (
     <TourContext.Provider value={value}>
       {children}
       {ready && active && (
         <TourStep
           key={`${active.id}-${active.index}`}
-          tour={TOURS[active.id]}
+          tour={{ ...TOURS[active.id], steps: active.steps }}
           tourId={active.id}
           index={active.index}
           dir={active.dir}

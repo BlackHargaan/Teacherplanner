@@ -196,8 +196,8 @@ export default function Settings() {
             <label className="btn" title="Students, grades, seating charts and sub notes for the classes in this planner">Import student information<input type="file" accept="application/json,.json" hidden onChange={importStudents} /></label>
           </div>
           <div className="row wrap">
-            <button onClick={() => { if (window.confirm(`Replace everything with sample data?${cloud.savingOnline ? ' Saving online stops on this computer; your plans saved online stay as they are.' : ''}`)) { replace(resetToDemo()); notify('Loaded the sample planner.', { undo: true }); } }}>Load sample data</button>
-            <button className="danger" onClick={() => { if (window.confirm(`Erase everything and start fresh?${cloud.savingOnline ? ' Saving online stops on this computer; your plans saved online stay as they are.' : ''}`)) { replace(resetToEmpty()); notify('Started a fresh planner.', { undo: true }); } }}>Start fresh</button>
+            <button onClick={() => { if (window.confirm(`Replace everything with sample data?${cloud.savingOnline ? ' Saving online stops on this computer; your plans saved online stay as they are.' : ''}`)) { replace(resetToDemo(state)); notify('Loaded the sample planner.', { undo: true }); } }}>Load sample data</button>
+            <button className="danger" onClick={() => { if (window.confirm(`Erase everything and start fresh?${cloud.savingOnline ? ' Saving online stops on this computer; your plans saved online stay as they are.' : ''}`)) { replace(resetToEmpty(state)); notify('Started a fresh planner.', { undo: true }); } }}>Start fresh</button>
           </div>
         </section>
       </div>

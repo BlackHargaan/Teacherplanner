@@ -84,3 +84,22 @@ describe('placing the explanation box', () => {
     expect(p.top + box.height).toBeLessThanOrEqual(800);
   });
 });
+
+import { stepsFor, pageTourFor as pageTour } from '../src/lib/tours.js';
+describe('tours on an empty planner', () => {
+  it('skip the week-view steps and point at the setup steps instead', () => {
+    const empty = stepsFor('start', { hasClasses: false }).map((s) => s.title);
+    const full = stepsFor('start', { hasClasses: true }).map((s) => s.title);
+    expect(empty).toContain('Start here');
+    expect(empty).not.toContain('The Planner');
+    expect(empty).not.toContain('Lessons flow onto your schedule');
+    expect(full).not.toContain('Start here');
+    expect(full).toContain('Lessons flow onto your schedule');
+  });
+  it('hold the Planner page tour until there are classes', () => {
+    expect(stepsFor('planner', { hasClasses: false })).toEqual([]);
+    expect(pageTour('planner', { hasClasses: false })).toBe(null);
+    expect(pageTour('planner', { hasClasses: true })).toBe('planner');
+    expect(pageTour('setup', { hasClasses: false })).toBe('setup');
+  });
+});

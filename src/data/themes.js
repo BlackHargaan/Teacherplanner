@@ -11,7 +11,7 @@ const palette = (id, name, light, dark) => ({ id, name, light, dark });
 export const PALETTES = [
   palette('sage', 'Sage',
     { bg: '#EEF0EC', surface: '#FAFBF9', surface2: '#E2E7E1', border: '#D6DCD5', text: '#1F2A24', muted: '#56635B', accent: '#3F6F5A', onAccent: '#F6F7F4' },
-    { bg: '#151A17', surface: '#1C221E', surface2: '#262E28', border: '#313B33', text: '#E3E8E4', muted: '#9DA9A2', accent: '#8CC0A5', onAccent: '#132019' }),
+    { bg: '#151816', surface: '#1B1E1C', surface2: '#252926', border: '#323733', text: '#E4E7E5', muted: '#A2AAA5', accent: '#8CC0A5', onAccent: '#132019' }),
   palette('harbor', 'Harbor',
     { bg: '#EBEFF2', surface: '#F8FAFB', surface2: '#DEE5EA', border: '#D2DBE1', text: '#1A2630', muted: '#536270', accent: '#2C6577', onAccent: '#F5F7F9' },
     { bg: '#12181D', surface: '#182027', surface2: '#222C34', border: '#2D3943', text: '#E2E8EC', muted: '#9AA8B2', accent: '#7FBCCB', onAccent: '#0E1A1F' }),

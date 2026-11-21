@@ -17,6 +17,7 @@
   --margin-line: color-mix(in srgb, #C2412F 60%, transparent);
   --mark: #FFE14D;
   --mark-text: #1A1A16;
+  --mark-band: linear-gradient(transparent 16%, var(--mark) 16%, var(--mark) 86%, transparent 86%);
   --card-tint: 14%;
   --danger: #B4372B;
   --shadow: none;
@@ -28,18 +29,19 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-mode="light"]) {
-    --bg: var(--d-surface, #1C221E);
-    --surface: var(--d-surface, #1C221E);
-    --surface-2: var(--d-surface2, #262E28);
-    --border: var(--d-border, #313B33);
-    --text: var(--d-text, #E3E8E4);
-    --muted: var(--d-muted, #9DA9A2);
+    --bg: var(--d-surface, #1B1E1C);
+    --surface: var(--d-surface, #1B1E1C);
+    --surface-2: var(--d-surface2, #252926);
+    --border: var(--d-border, #323733);
+    --text: var(--d-text, #E4E7E5);
+    --muted: var(--d-muted, #A2AAA5);
     --accent: var(--d-accent, #8CC0A5);
     --accent-text: var(--d-on-accent, #132019);
     --card-tint: 12%;
     --danger: #F08A80;
     --shadow: none;
     --sec-mix: 55%;
+    --sec-body-mix: 100%;
     --margin-line: color-mix(in srgb, #E07A6B 55%, transparent);
     --mark: color-mix(in srgb, #FFD60A 34%, transparent);
     --mark-text: var(--text);
@@ -50,18 +52,19 @@
   }
 }
 :root[data-mode="dark"] {
-  --bg: var(--d-surface, #1C221E);
-  --surface: var(--d-surface, #1C221E);
-  --surface-2: var(--d-surface2, #262E28);
-  --border: var(--d-border, #313B33);
-  --text: var(--d-text, #E3E8E4);
-  --muted: var(--d-muted, #9DA9A2);
+  --bg: var(--d-surface, #1B1E1C);
+  --surface: var(--d-surface, #1B1E1C);
+  --surface-2: var(--d-surface2, #252926);
+  --border: var(--d-border, #323733);
+  --text: var(--d-text, #E4E7E5);
+  --muted: var(--d-muted, #A2AAA5);
   --accent: var(--d-accent, #8CC0A5);
   --accent-text: var(--d-on-accent, #132019);
   --card-tint: 12%;
   --danger: #F08A80;
   --shadow: none;
   --sec-mix: 55%;
+  --sec-body-mix: 100%;
   --margin-line: color-mix(in srgb, #E07A6B 55%, transparent);
   --mark: color-mix(in srgb, #FFD60A 34%, transparent);
   --mark-text: var(--text);
@@ -76,7 +79,9 @@ h1 { font-size: 1.55rem; margin: 0; font-weight: 700; letter-spacing: -0.015em; 
 h2 { font-size: 1.05rem; margin: 0 0 0.6rem; font-weight: 600; }
 h3 { font-size: 0.95rem; margin: 1rem 0 0.4rem; font-weight: 600; }
 /* The highlighter: marks the current page, view and today, like a marker on a paper planner. */
-.mark-on, .tab-on, #main-nav a.on { background-image: linear-gradient(transparent 52%, var(--mark) 52%, var(--mark) 92%, transparent 92%); color: var(--mark-text); }
+.mark-on, .tab-on, #main-nav a.on { background-image: var(--mark-band); color: var(--mark-text); }
+/* the stroke runs a little past the word, as a marker does */
+.mark-on, .tabs button.tab-on, #main-nav a.on, .nav-more.on > .icon-btn { padding-left: 0.2em; padding-right: 0.2em; margin-left: -0.2em; margin-right: -0.2em; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
 
 input, select, textarea, button, .btn {
   font: inherit; color: inherit; background: var(--surface); border: 1px solid var(--field-border);
@@ -86,6 +91,8 @@ textarea { width: 100%; resize: vertical; }
 input[type="color"] { width: 2.4rem; height: 2rem; padding: 2px; cursor: pointer; flex: none; }
 /* Section colors stay readable on dark backgrounds by mixing toward the text color. */
 .sec-text { color: color-mix(in srgb, var(--sec, var(--text)) calc(100% - var(--sec-mix, 0%)), var(--text)); }
+/* In dark mode a column of colored lines is tiring to read: lesson text uses the reading color, labels keep theirs. */
+.lc-sec-body.sec-text { color: color-mix(in srgb, var(--sec, var(--text)) calc(100% - var(--sec-body-mix, var(--sec-mix, 0%))), var(--text)); }
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 button, .btn { cursor: pointer; background: var(--surface); border-color: var(--field-border); border-radius: var(--radius); display: inline-flex; align-items: center; gap: 0.3rem; text-decoration: none; white-space: nowrap; }
 button:hover:not(:disabled), .btn:hover { border-color: var(--text); }
@@ -118,7 +125,7 @@ fieldset.plain { border: 0; padding: 0; margin: 0; min-width: 0; }
 #main-nav a:hover, .nav-more > .icon-btn:hover { text-decoration: underline; text-underline-offset: 4px; }
 #main-nav a.on, .nav-more.on > .icon-btn { font-weight: 600; }
 .nav-more > .icon-btn { border: 0; background: none; }
-.nav-more.on > .icon-btn { background-image: linear-gradient(transparent 52%, var(--mark) 52%, var(--mark) 92%, transparent 92%); color: var(--mark-text); }
+.nav-more.on > .icon-btn { background-image: var(--mark-band); color: var(--mark-text); }
 .nav-narrow { display: none; }
 .year-progress { font: 500 0.78rem var(--mono); color: var(--muted); white-space: nowrap; }
 .main-col { min-width: 0; display: flex; flex-direction: column; flex: 1; }
@@ -158,7 +165,7 @@ fieldset.plain { border: 0; padding: 0; margin: 0; min-width: 0; }
 .tabs { display: inline-flex; align-self: flex-start; gap: 0.9rem; margin-bottom: 0.75rem; flex-wrap: wrap; border-bottom: 1px solid var(--rule); }
 .tabs button { border: none; border-radius: 0; background: transparent; padding: 0.35rem 0.1rem; color: var(--muted); }
 .tabs button:hover:not(:disabled) { color: var(--text); }
-.tabs button.tab-on { color: var(--mark-text); font-weight: 600; background-image: linear-gradient(transparent 52%, var(--mark) 52%, var(--mark) 92%, transparent 92%); }
+.tabs button.tab-on { color: var(--mark-text); font-weight: 600; background-image: var(--mark-band); }
 
 /* tables */
 .table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
@@ -215,7 +222,7 @@ fieldset.plain { border: 0; padding: 0; margin: 0; min-width: 0; }
 .day-col { display: flex; flex-direction: column; gap: 0.55rem; min-height: 200px; }
 .is-today .day-name .mark-on, .day-col.is-today .day-name .mark-on { font-weight: 700; }
 .day-name .mark-on { background: none; color: inherit; }
-.is-today .day-name .mark-on { background-image: linear-gradient(transparent 52%, var(--mark) 52%, var(--mark) 92%, transparent 92%); color: var(--mark-text); }
+.is-today .day-name .mark-on { background-image: var(--mark-band); color: var(--mark-text); }
 .day-head { display: flex; justify-content: space-between; align-items: flex-start; padding: 0.1rem 0.25rem 0.2rem 0.6rem; }
 .day-name { font-weight: 600; display: inline-block; }
 .off-day { margin: auto; color: var(--muted); font-style: italic; }

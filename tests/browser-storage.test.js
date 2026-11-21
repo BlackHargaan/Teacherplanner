@@ -15,3 +15,13 @@ describe('backup reminder', () => {
     expect(backupReminderDue(null, '2026-12-01', '2026-11-26')).toBe(false);
   });
 });
+
+import { formatDateRange } from '../src/lib/dates.js';
+describe('week headings', () => {
+  it('names the week compactly', () => {
+    expect(formatDateRange('2026-11-23', '2026-11-27')).toBe('Nov 23–27, 2026');
+    expect(formatDateRange('2026-11-30', '2026-12-04')).toBe('Nov 30 – Dec 4, 2026');
+    expect(formatDateRange('2026-12-28', '2027-01-01')).toBe('Dec 28, 2026 – Jan 1, 2027');
+    expect(formatDateRange('2026-11-23', '2026-11-23')).toBe('Nov 23, 2026');
+  });
+});

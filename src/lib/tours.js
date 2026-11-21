@@ -29,8 +29,9 @@ export const TOURS = {
       {
         route: 'planner',
         target: '.planner .toolbar',
+        optional: true, // an empty planner shows its setup steps instead
         title: 'The Planner',
-        body: 'See your week, a single day, or one class’s lessons in order. The arrows and Today move through the year, and the class buttons show or hide classes.',
+        body: 'The title says which week you’re looking at; click it to jump to a date, or use the arrows and Today. Switch between Week, Day and one class’s lessons in order, and use View options to show details or hide a class.',
       },
       {
         route: 'planner',
@@ -79,7 +80,7 @@ export const TOURS = {
     title: 'The Planner',
     steps: [
       { route: 'planner', target: '.planner .toolbar .tabs', title: 'Three ways to look', body: 'Week is your plan book, a row for each class and a column for each day. Day shows one day in more room, and Class list shows one class’s lessons in order, where you can reorder them.' },
-      { route: 'planner', target: '.planner .toolbar .class-toggle', optional: true, title: 'Show or hide classes', body: 'Click a class to hide it for now, for example to focus on one subject. Details shows more of each lesson.' },
+      { route: 'planner', target: '.planner .toolbar .view-options', optional: true, title: 'View options', body: 'Show or hide each lesson’s details, and hide a class for now, for example to focus on one subject.' },
       { route: 'planner', target: ['.planbook .meeting', '.week-grid .meeting'], optional: true, title: 'A lesson', body: 'Click to open and edit it. Drag it to another day to move it, or onto another class to copy it. Its ⋯ menu can bump, extend or remove it.' },
       { route: 'planner', target: ['.pb-day .menu', '.day-head .menu'], optional: true, title: 'Day menu', body: 'Cancel the day, switch it to an alternate schedule (early release, assembly…), add an extra class, or print sub plans for it.' },
       { route: 'planner', target: '.print-menu', title: 'Print or PDF', body: 'Make weekly lesson plans or a full sub plan packet as a PDF.' },

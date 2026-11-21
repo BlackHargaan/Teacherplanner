@@ -78,6 +78,26 @@ export function Menu({ label = '⋯', items, title = 'Actions', className = '' }
   );
 }
 
+/** A button that opens a small panel of controls (checkboxes, etc.); closes on outside click or Escape. */
+export function Popover({ label, title, className = '', children }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef();
+  useEffect(() => {
+    if (!open) return undefined;
+    const close = (e) => !ref.current?.contains(e.target) && setOpen(false);
+    const esc = (e) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', esc); };
+  }, [open]);
+  return (
+    <div className={`popover ${className}`} ref={ref}>
+      <button type="button" aria-expanded={open} title={title} onClick={() => setOpen((o) => !o)}>{label}</button>
+      {open && <div className="popover-panel" role="group" aria-label={title}>{children}</div>}
+    </div>
+  );
+}
+
 /**
  * Multi-select chip picker with search and optional free-text add.
  * options: [{value, label, sub?, color?}]

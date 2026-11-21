@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../lib/store.jsx';
+import { navigate } from '../lib/router.js';
 import { makeYear, rolloverDays, rolloverYear, uid, yearClasses } from '../lib/model.js';
 import { CANCELLED_ROTATION, CYCLE_NAMES, NON_SCHOOL_KINDS, SCHEDULE_TYPES, dayKeyLabel, schoolDays, setCycleLength, splitGradingPeriods } from '../lib/schedule.js';
 import { periodTimesFrom } from '../lib/bells.js';
@@ -15,8 +16,9 @@ export default function Setup() {
   const { state, update, year, notify } = useStore();
   const [rollover, setRollover] = useState(false);
   const [importing, setImporting] = useState(false);
-  const setYear = (patch) => update((d) => Object.assign(d.years.find((y) => y.id === year.id), patch));
-  const editYear = (fn) => update((d) => fn(d.years.find((y) => y.id === year.id)));
+  // Any change here means the teacher has looked at the year: it's no longer a draft.
+  const setYear = (patch) => update((d) => { const y = d.years.find((x) => x.id === year.id); Object.assign(y, patch); delete y.draft; });
+  const editYear = (fn) => update((d) => { const y = d.years.find((x) => x.id === year.id); fn(y); delete y.draft; });
   const days = schoolDays(year);
   const classes = yearClasses(state, year.id);
   // Joined a school as a member: its shared schedule is read-only here.
@@ -37,9 +39,16 @@ export default function Setup() {
             {state.years.map((y) => <option key={y.id} value={y.id}>{y.name}</option>)}
           </select>
           <button onClick={() => { const y = makeYear({ name: 'New School Year' }); update((d) => { d.years.push(y); d.currentYearId = y.id; }); }}>New blank year</button>
-          <button className="primary" onClick={() => setRollover(true)}>Re-use for next year…</button>
+          <button onClick={() => setRollover(true)}>Re-use for next year…</button>
         </div>
       </div>
+
+      {year.draft && !year.school && (
+        <div className="setup-confirm" role="status">
+          <p><strong>Check your school year.</strong> It’s filled in as {formatDate(year.start, { month: 'long', day: 'numeric' })} to {formatDate(year.end, { month: 'long', day: 'numeric', year: 'numeric' })}. Change the dates, mark breaks on the calendar or import your district calendar below.</p>
+          <button className="primary" onClick={() => { setYear({}); navigate('classes'); }}>Looks right · next: add classes</button>
+        </div>
+      )}
 
       <div className="cards">
         <SchoolProfile year={year} />

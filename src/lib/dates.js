@@ -88,3 +88,13 @@ export function shiftYear(iso, years) {
   d.setFullYear(d.getFullYear() + years);
   return toISO(d);
 }
+
+/** A week's dates as a heading: "Nov 23–27, 2026", "Nov 30 – Dec 4, 2026", "Dec 28, 2026 – Jan 1, 2027". */
+export function formatDateRange(first, last) {
+  const a = fromISO(first); const b = fromISO(last);
+  const md = (d) => d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  if (first === last) return `${md(a)}, ${a.getFullYear()}`;
+  if (a.getFullYear() !== b.getFullYear()) return `${md(a)}, ${a.getFullYear()} – ${md(b)}, ${b.getFullYear()}`;
+  if (a.getMonth() === b.getMonth()) return `${md(a)}–${b.getDate()}, ${b.getFullYear()}`;
+  return `${md(a)} – ${md(b)}, ${b.getFullYear()}`;
+}

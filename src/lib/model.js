@@ -338,7 +338,8 @@ export function emptyState() {
   const user = { id: uid('user'), name: 'Me', email: '' };
   // This school year (August to June), ready to adjust on the Schedule page.
   const { start, end, label } = schoolYearBounds(today());
-  const year = makeYear({ name: `School Year ${label}`, start, end });
+  // draft: not looked at yet, so the planner keeps "Set up school year" as the next step.
+  const year = makeYear({ name: `School Year ${label}`, start, end, draft: true });
   return {
     version: 1,
     users: [user],
@@ -372,6 +373,8 @@ export function demoState() {
   const state = emptyState();
   // Untouched sample data: not worth keeping (cleared by the teacher's first edit).
   state.sample = true;
+  // Sample data at all (kept while exploring): the planner offers "Start my own planner".
+  state.sampleData = true;
   const me = state.users[0];
   me.name = 'Ms. Rivera';
   me.email = 'rivera@school.example';
@@ -380,6 +383,7 @@ export function demoState() {
 
   const { start, end, label } = schoolYearBounds(today());
   const year = state.years[0];
+  delete year.draft; // the sample's calendar is all set
   Object.assign(year, {
     name: `School Year ${label}`,
     start,

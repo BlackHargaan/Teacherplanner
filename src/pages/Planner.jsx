@@ -1,20 +1,20 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { navigate, useHashRoute } from '../lib/router.js';
-import { useStore } from '../lib/store.jsx';
+import { useStore, resetToDemo, resetToEmpty } from '../lib/store.jsx';
 import { canEdit, canView, uid } from '../lib/model.js';
 import { bump, clearAt, extend, insertAt, move, placeOrInsert, pullBack, swap } from '../lib/sequence.js';
 import { copyLesson, editSequence, pruneOrphans } from '../lib/actions.js';
-import { addDays, formatDate, formatTime, planningAnchor, startOfWeek, today, DOW_LONG } from '../lib/dates.js';
+import { addDays, formatDate, formatDateRange, formatTime, planningAnchor, startOfWeek, today, DOW_LONG } from '../lib/dates.js';
 import { dayKeyLabel, isNonSchoolDay, meetingIndexOnOrAfter, weekDates, weekStartDay } from '../lib/schedule.js';
 import { paintDates } from '../lib/calendarPaint.js';
 import { schoolReadOnly } from '../lib/cloud/schoolSync.js';
 import LessonEditor from '../components/LessonEditor.jsx';
 import { YearProgress } from '../components/YearProgress.jsx';
 import { LessonContent, StatusChips } from '../components/LessonContent.jsx';
-import { Field, Menu, Modal, Tabs, Empty } from '../components/ui.jsx';
+import { Field, Menu, Modal, Popover, Tabs, Empty } from '../components/ui.jsx';
 
 export default function Planner() {
-  const { state, year, classes, calendar, userId } = useStore();
+  const { state, year, classes, calendar, userId, replace, notify } = useStore();
   const [anchor, setAnchor] = useState(() => {
     const t = planningAnchor();
     return t < year.start ? year.start : t > year.end ? year.end : t;
@@ -49,26 +49,47 @@ export default function Planner() {
   const dates = mode === 'day' ? [anchor] : weekDates(anchor, year.weekdays).filter((d) => (year.weekdays || [1, 2, 3, 4, 5]).includes(new Date(d + 'T00:00').getDay()));
   const step = mode === 'day' ? 1 : 7;
 
+  // No classes yet: setup is the whole screen; the week tools have nothing to work on.
+  if (visible.length === 0 && !editing) {
+    return (
+      <div className="page planner">
+        <SetupPanel year={year} hasClasses={classes.length > 0} onSample={() => { replace(resetToDemo()); notify('Loaded the sample planner. Look around; nothing here is yours yet.'); }} />
+      </div>
+    );
+  }
+
+  const title = mode === 'day'
+    ? formatDate(anchor, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })
+    : dates.length ? formatDateRange(dates[0], dates[dates.length - 1]) : formatDate(anchor, { month: 'short', day: 'numeric', year: 'numeric' });
+
   return (
     <div className="page planner">
-      <div className="toolbar no-print">
-        <Tabs tabs={[['week', 'Week'], ['day', 'Day'], ['class', 'Class list']]} value={mode} onChange={setMode} />
-        <div className="row">
-          <button onClick={() => setAnchor(addDays(anchor, -step))} aria-label="Previous">‹</button>
-          <button onClick={() => setAnchor(planningAnchor())}>Today</button>
-          <button onClick={() => setAnchor(addDays(anchor, step))} aria-label="Next">›</button>
-          <input type="date" value={anchor} onChange={(e) => e.target.value && setAnchor(e.target.value)} />
+      {state.sampleData && (
+        <div className="sample-banner no-print" role="status">
+          <span><strong>This is a sample planner.</strong> Click around and change anything; none of it is yours.</span>
+          <button className="primary" onClick={() => { if (window.confirm('Clear the sample and start your own planner?')) { replace(resetToEmpty()); notify('Started your own planner.', { undo: true }); } }}>Start my own planner</button>
         </div>
-        <div className="row wrap">
+      )}
+      <div className="toolbar no-print">
+        <div className="date-nav" role="group" aria-label="Which week">
+          <button onClick={() => setAnchor(addDays(anchor, -step))} aria-label={mode === 'day' ? 'Previous day' : 'Previous week'}>‹</button>
+          <button onClick={() => setAnchor(planningAnchor())}>Today</button>
+          <button onClick={() => setAnchor(addDays(anchor, step))} aria-label={mode === 'day' ? 'Next day' : 'Next week'}>›</button>
+          <DateTitle title={title} value={anchor} onChange={setAnchor} />
+          <YearProgress />
+        </div>
+        <div className="grow" />
+        <Tabs tabs={[['week', 'Week'], ['day', 'Day'], ['class', 'Class list']]} value={mode} onChange={setMode} />
+        <Popover className="view-options" label="View options ▾" title="View options">
+          <label className="row"><input type="checkbox" checked={detail} onChange={(e) => setDetail(e.target.checked)} /> Show lesson details</label>
+          <div className="popover-heading">Classes</div>
           {visible.map((c) => (
             <label key={c.id} className="class-toggle" style={{ '--c': c.color }}>
               <input type="checkbox" checked={!hidden.includes(c.id)} onChange={() => setHidden((h) => (h.includes(c.id) ? h.filter((x) => x !== c.id) : [...h, c.id]))} />
               {c.name}
             </label>
           ))}
-        </div>
-        <label className="row small"><input type="checkbox" checked={detail} onChange={(e) => setDetail(e.target.checked)} /> Details</label>
-        <YearProgress />
+        </Popover>
         <Menu
           className="print-menu"
           title="Print / PDF"
@@ -81,18 +102,6 @@ export default function Planner() {
           ]}
         />
       </div>
-
-      {visible.length === 0 && (
-        <section className="getting-started">
-          <h2>Set up your plan book</h2>
-          <ol>
-            <li><a href="#/setup">Schedule</a>: your school year’s first and last day, breaks and days off. You can import your district calendar.</li>
-            <li><a href="#/classes">Classes</a>: each class you teach and when it meets.</li>
-            <li>Come back here and plan lessons. Each class gets a row in your week.</li>
-          </ol>
-          <p className="small muted">Want to look around first? <a href="#/settings/data">Load sample data</a> in Settings, then use <strong>Start fresh</strong> there when you’re ready.</p>
-        </section>
-      )}
 
       {mode === 'class' ? (
         <ClassList
@@ -126,6 +135,62 @@ export default function Planner() {
       {dialog?.kind === 'target' && <TargetDialog {...dialog} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'extra' && <ExtraClassDialog {...dialog} onClose={() => setDialog(null)} />}
     </div>
+  );
+}
+
+/** The week (or day) as a heading; clicking it opens the date picker. */
+function DateTitle({ title, value, onChange }) {
+  const input = useRef();
+  const open = () => {
+    const el = input.current;
+    if (el?.showPicker) { try { el.showPicker(); return; } catch { /* fall through */ } }
+    el?.focus();
+  };
+  return (
+    <span className="date-title">
+      <button type="button" className="date-title-btn" onClick={open} title="Pick a date">{title}</button>
+      <input ref={input} type="date" className="date-title-input" value={value} onChange={(e) => e.target.value && onChange(e.target.value)} aria-label="Go to date" tabIndex={-1} />
+    </span>
+  );
+}
+
+/**
+ * An empty planner: the steps to set it up, with the next one as the main
+ * button, and the sample planner as a way to look around first.
+ */
+function SetupPanel({ year, hasClasses, onSample }) {
+  const { calendar } = useStore();
+  const yearDone = !year.draft || Boolean(year.school); // a joined school's calendar counts
+  const days = calendar?.days.length || 0;
+  return (
+    <section className="setup-panel">
+      <h1>Set up your planner</h1>
+      <p className="setup-lede">Two steps: tell Teacher Planner when your school year runs, then add the classes you teach. Your week fills in from there.</p>
+      <ol className="setup-steps">
+        <li className={yearDone ? 'done' : 'current'}>
+          <div className="setup-step-text">
+            <h2>{yearDone ? '✓ ' : ''}School year</h2>
+            {yearDone ? (
+              <p>{year.name} · {formatDate(year.start, { month: 'short', day: 'numeric' })} to {formatDate(year.end, { month: 'short', day: 'numeric', year: 'numeric' })} · {days} school days</p>
+            ) : (
+              <p>First and last day, breaks and days off. You can import your district calendar.</p>
+            )}
+          </div>
+          {yearDone ? <a className="btn" href="#/setup">Edit</a> : <a className="btn primary" href="#/setup">Set up school year</a>}
+        </li>
+        <li className={yearDone ? 'current' : ''}>
+          <div className="setup-step-text">
+            <h2>Classes</h2>
+            <p>{hasClasses ? 'You have classes, but they’re hidden or shared with you read-only.' : 'Each class you teach and when it meets.'}</p>
+          </div>
+          <a className={`btn ${yearDone ? 'primary' : ''}`} href="#/classes">Add classes</a>
+        </li>
+      </ol>
+      <div className="setup-sample">
+        <button onClick={onSample}>Try sample planner</button>
+        <span className="small muted">See a full week of example classes and lessons. You can clear it with one button.</span>
+      </div>
+    </section>
   );
 }
 

@@ -6,7 +6,8 @@ import { formatDate, today } from '../lib/dates.js';
 export function YearProgress() {
   const { year, calendar } = useStore();
   const p = year && calendar ? yearProgress(year, calendar.days, today()) : null;
-  if (!p || !p.total) return null;
+  // Only once the teacher has set up the calendar; before that the count means nothing.
+  if (!p || !p.total || (year.draft && !year.school)) return null;
   return (
     <span className="year-progress" title={year.name}>
       {p.stage === 'before' && `${year.name} starts ${formatDate(p.starts, { month: 'short', day: 'numeric' })} · ${p.total} school days`}

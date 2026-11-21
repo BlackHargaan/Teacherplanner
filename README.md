@@ -13,7 +13,7 @@ Teacher Planner is a **desktop app for Windows, Mac and Linux**. Like Obsidian, 
 2. On first launch, pick where to keep your planner:
    - **Save my planner in Documents** creates `Documents/Teacher Planner`.
    - **Choose another folder…** lets you pick a folder in **OneDrive, Google Drive or Dropbox** to use the same planner at home and at school. Install the app on both computers and choose the same folder.
-3. Start with an empty planner for this school year. The Planner shows the three setup steps (Schedule, Classes, then lessons). **Settings → Data → Load sample data** fills in example classes to look around, and **Start fresh** clears them.
+3. Start with an empty planner for this school year. Until there are classes, the Planner is a setup screen: **Set up school year** (the Schedule page asks the teacher to check the filled-in dates, then **Looks right · next: add classes**), then **Add classes**. **Try sample planner** loads example classes to look around, with a banner and **Start my own planner** to clear them (also under Settings → Data).
 
 The app checks for new versions at launch and every few hours, and teachers can check any time under **Settings → Updates** or **Help → Check for Updates…**.
 - **Windows and Linux:** the update downloads in the background and installs on restart. A banner offers **Restart to update**.

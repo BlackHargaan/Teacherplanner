@@ -175,7 +175,7 @@ export default function Settings() {
           <button onClick={() => update((d) => { d.statuses.push({ id: uid('st'), name: 'New status', color: '#0ea5e9' }); })}>+ Status</button>
         </section>
 
-        <section data-tour="data" className="card">
+        <section data-tour="data" id="data" className="card">
           <h2>Data</h2>
           {host && vault?.vaultPath ? (
             <>

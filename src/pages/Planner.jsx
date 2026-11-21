@@ -83,7 +83,15 @@ export default function Planner() {
       </div>
 
       {visible.length === 0 && (
-        <Empty>No classes yet. Set up your school year and classes under <a href="#/setup">Schedule</a> and <a href="#/classes">Classes</a>.</Empty>
+        <section className="getting-started">
+          <h2>Set up your plan book</h2>
+          <ol>
+            <li><a href="#/setup">Schedule</a>: your school year’s first and last day, breaks and days off. You can import your district calendar.</li>
+            <li><a href="#/classes">Classes</a>: each class you teach and when it meets.</li>
+            <li>Come back here and plan lessons. Each class gets a row in your week.</li>
+          </ol>
+          <p className="small muted">Want to look around first? <a href="#/settings/data">Load sample data</a> in Settings, then use <strong>Start fresh</strong> there when you’re ready.</p>
+        </section>
       )}
 
       {mode === 'class' ? (

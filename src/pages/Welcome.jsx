@@ -1,6 +1,6 @@
 import { BrandMark } from '../components/BrandMark.jsx';
 import { useState } from 'react';
-import { host, useStore, resetToDemo, resetToEmpty } from '../lib/store.jsx';
+import { host, useStore, resetToEmpty } from '../lib/store.jsx';
 
 /**
  * Pick a folder and open it. Nothing here is saved yet, so a folder that
@@ -65,13 +65,9 @@ export default function Welcome() {
         ) : (
           <>
             <p>Your planner folder is ready:<br /><code>{vault.vaultPath}</code></p>
-            <button className="primary big" onClick={() => replace(resetToDemo())}>
-              Start with sample classes
-              <span className="small">Explore with example lessons, a roster and grades. You can clear them later in Settings.</span>
-            </button>
-            <button className="big" onClick={() => replace(resetToEmpty())}>
-              Start with an empty planner
-              <span className="small">Set up your school year and classes from scratch.</span>
+            <button className="primary big" onClick={() => replace(resetToEmpty())}>
+              Start my planner
+              <span className="small">An empty planner for this school year. Add your school calendar and classes, then your lessons.</span>
             </button>
             <label className="btn big">
               Import a backup file…

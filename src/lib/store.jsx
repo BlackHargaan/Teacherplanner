@@ -9,15 +9,18 @@ export const StoreContext = createContext(null);
 /** Desktop app bridge (Electron preload); undefined when running in a browser. */
 export const host = typeof window !== 'undefined' ? window.plannerHost : undefined;
 
-/** Browser: the saved planner; sample data on a first visit; null when it can't be read. */
+/**
+ * Browser: the saved planner; an empty one on a first visit (sample data is
+ * under Settings → Data); null when it can't be read.
+ */
 async function loadBrowser({ firstLoad }) {
   try {
     const raw = await loadPlanner();
     if (raw) return migrate(JSON.parse(raw));
   } catch {
-    return firstLoad ? demoState() : null;
+    return firstLoad ? emptyState() : null;
   }
-  return firstLoad ? demoState() : null;
+  return firstLoad ? emptyState() : null;
 }
 
 /** Fill in any fields added after the data was first saved. */

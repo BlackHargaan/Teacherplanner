@@ -336,7 +336,9 @@ export function rolloverYear(state, yearId, { name, start, end, copyLessons = tr
 
 export function emptyState() {
   const user = { id: uid('user'), name: 'Me', email: '' };
-  const year = makeYear({ name: 'My School Year' });
+  // This school year (August to June), ready to adjust on the Schedule page.
+  const { start, end, label } = schoolYearBounds(today());
+  const year = makeYear({ name: `School Year ${label}`, start, end });
   return {
     version: 1,
     users: [user],
